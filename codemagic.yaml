@@ -15,8 +15,8 @@ workflows:
       - name: Initialize Keychain & Fetch Signing
         script: |
           keychain initialize
-          # Certifique-se de que o bundle ID "com.pax.suporte" está correto no App Store Connect
-          app-store-connect fetch-signing-files "com.pax.suporte" --type IOS_APP_DEVELOPMENT --create
+          # Bundle ID atualizado para br.com.paxrioverde.app conforme build.gradle.kts
+          app-store-connect fetch-signing-files "br.com.paxrioverde.app" --type IOS_APP_DEVELOPMENT --create
           keychain add-certificates
       - name: Build Kotlin Shared Module
         script: ./gradlew :composeApp:assembleDebug
@@ -30,4 +30,4 @@ workflows:
     publishing:
       email:
         recipients:
-          - seu-paxadmrv@gmail.com
+          - paxadmrv@gmail.com
