@@ -10,15 +10,17 @@ workflows:
         XCODE_WORKSPACE: "iosApp/iosApp.xcworkspace"
         XCODE_SCHEME: "iosApp"
     scripts:
-      - name: Build shared module
-        script: ./gradlew :composeApp:assembleDebug
-      - name: iOS Code Signing
+      - name: Set gradlew permissions
+        script: chmod +x gradlew
+      - name: Initialize Keychain & Fetch Signing
         script: |
           keychain initialize
+          # Certifique-se de que o bundle ID "com.pax.suporte" está correto no App Store Connect
           app-store-connect fetch-signing-files "com.pax.suporte" --type IOS_APP_DEVELOPMENT --create
           keychain add-certificates
-          xcode-project use-profiles
-      - name: Build IPA
+      - name: Build Kotlin Shared Module
+        script: ./gradlew :composeApp:assembleDebug
+      - name: Build iOS App
         script: |
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
