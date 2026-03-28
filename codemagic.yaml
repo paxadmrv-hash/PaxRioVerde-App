@@ -1,3 +1,5 @@
+# Configuração do Build para Pax Rio Verde (Grupo Universo)
+# Projeto: No Bico / Pax Suporte
 workflows:
   ios-workflow:
     name: Pax Rio Verde iOS Build
@@ -5,36 +7,41 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - "Pax Rio Verde"
+        - "Pax Rio Verde" # Certifique-se de que CERTIFICATE_P12 e CERTIFICATE_PASSWORD estão aqui
       vars:
         XCODE_WORKSPACE: "iosApp/iosApp.xcworkspace"
         XCODE_SCHEME: "iosApp"
+        APP_ID: "br.com.paxrioverde.app"
     scripts:
       - name: Set gradlew permissions
         script: chmod +x gradlew
-      - name: Initialize Keychain & Fetch Signing
-        script: |
-          keychain initialize
-          
-          # 1. Criar o arquivo da chave preservando as quebras de linha corretamente
-          cat <<EOF > ./private_key.p8
-          $APP_STORE_CONNECT_PRIVATE_KEY
-          EOF
 
-          # 2. Comando simplificado: Deixe o Codemagic usar as variáveis de ambiente automaticamente
-          # Ele já sabe ler as variáveis APP_STORE_CONNECT_... se o nome estiver correto
-          app-store-connect fetch-signing-files "br.com.paxrioverde.app" \
+      - name: Initialize Keychain
+        script: keychain initialize
+
+      - name: Install Manual Certificate
+        script: |
+          # Decodifica o certificado P12 das variáveis secretas e instala no Keychain do Mac
+          echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
+          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
+
+      - name: Fetch Provisioning Profiles
+        script: |
+          # Baixa o Profile que combina com o certificado manual que instalamos acima
+          app-store-connect fetch-signing-files "$APP_ID" \
             --type IOS_APP_DEVELOPMENT \
             --create
-          
-          keychain add-certificates
+
       - name: Build Kotlin Shared Module
         script: ./gradlew :composeApp:assembleDebug
+
       - name: Build iOS App
         script: |
+          # Compila o IPA usando o esquema e workspace definidos nas variáveis
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME"
+
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
