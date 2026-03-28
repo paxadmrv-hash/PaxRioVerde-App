@@ -7,7 +7,7 @@ workflows:
       groups:
         - "Pax Rio Verde"
       vars:
-        # Ajustado para o nome que vi no seu print
+        # Caminho extraído do seu print do GitHub
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
@@ -20,6 +20,7 @@ workflows:
 
       - name: Install Manual Certificate
         script: |
+          # Limpa o Base64 e instala o certificado da Natalia
           echo "$CERTIFICATE_P12" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
@@ -28,13 +29,31 @@ workflows:
 
       - name: Build iOS App
         script: |
-          # 1. Gera o arquivo de instruções que estava faltando (export_options.plist)
-          xcode-project use-profiles --export-type development
+          # 1. CRIANDO O ARQUIVO DE EXPORTAÇÃO (O que estava faltando)
+          # Usando o Team ID: 264TWUW2L6 do seu certificado
+          cat <<EOF > /Users/builder/export_options.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>development</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>teamID</key>
+              <string>264TWUW2L6</string>
+              <key>compileBitcode</key>
+              <false/>
+          </dict>
+          </plist>
+          EOF
 
-          # 2. Executa o build usando o .xcodeproj (que é o que aparece no seu print)
+          # 2. EXECUTANDO O BUILD IPA
+          # Apontando para o arquivo .plist criado acima
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME"
+            --scheme "$XCODE_SCHEME" \
+            --export-options-plist "/Users/builder/export_options.plist"
 
     artifacts:
       - build/ios/ipa/*.ipa
