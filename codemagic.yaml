@@ -7,7 +7,6 @@ workflows:
       groups:
         - "Pax Rio Verde"
       vars:
-        # Removi as variáveis estáticas de caminho para usar a busca automática abaixo
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
     scripts:
@@ -27,11 +26,15 @@ workflows:
 
       - name: Build iOS App
         script: |
-          # 1. Busca automática pelo arquivo de workspace do Xcode
+          # 1. Busca automática pelo workspace
           WORKSPACE_PATH=$(find . -name "*.xcworkspace" | head -n 1)
           echo "Workspace encontrado em: $WORKSPACE_PATH"
-          
-          # 2. Executa o build usando o caminho real encontrado
+
+          # 2. GERA O ARQUIVO QUE ESTAVA FALTANDO (export_options.plist)
+          # Isso avisa que o build é para desenvolvimento
+          xcode-project use-profiles --export-type development
+
+          # 3. Executa o build agora com as instruções de exportação criadas
           xcode-project build-ipa \
             --workspace "$WORKSPACE_PATH" \
             --scheme "$XCODE_SCHEME"
