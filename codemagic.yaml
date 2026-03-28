@@ -15,10 +15,17 @@ workflows:
       - name: Initialize Keychain & Fetch Signing
         script: |
           keychain initialize
-          # Removemos a flag que causou erro e mantemos o --create para gerar o certificado
+          
+          # Limpeza de perfis locais antigos para evitar conflitos
+          rm -f ~/Library/MobileDevice/Provisioning\ Profiles/*
+          
+          # Comando para buscar e criar o certificado do zero
+          # O --create garante que, se não houver um certificado com chave privada local, 
+          # ele tentará gerar um novo no portal da Apple.
           app-store-connect fetch-signing-files "br.com.paxrioverde.app" \
             --type IOS_APP_DEVELOPMENT \
             --create
+          
           keychain add-certificates
       - name: Build Kotlin Shared Module
         script: ./gradlew :composeApp:assembleDebug
