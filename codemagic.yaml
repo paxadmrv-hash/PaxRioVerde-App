@@ -5,7 +5,7 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - "Pax Rio Verde" # Onde você salvou CERTIFICATE_P12 e CERTIFICATE_PASSWORD
+        - "Pax Rio Verde"
       vars:
         XCODE_WORKSPACE: "iosApp/iosApp.xcworkspace"
         XCODE_SCHEME: "iosApp"
@@ -17,22 +17,16 @@ workflows:
         script: keychain initialize
       - name: Install Manual Certificate
         script: |
-          # Aqui instalamos o certificado que você gerou no seu PC
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
       - name: Fetch Provisioning Profiles
         script: |
-          # Baixa o profile que aceita o seu certificado manual
-          app-store-connect fetch-signing-files "$APP_ID" \
-            --type IOS_APP_DEVELOPMENT \
-            --create
+          app-store-connect fetch-signing-files "$APP_ID" --type IOS_APP_DEVELOPMENT --create
       - name: Build Kotlin Shared Module
         script: ./gradlew :composeApp:assembleDebug
       - name: Build iOS App
         script: |
-          xcode-project build-ipa \
-            --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME"
+          xcode-project build-ipa --workspace "$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
