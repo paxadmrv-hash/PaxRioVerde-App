@@ -7,7 +7,7 @@ workflows:
       groups:
         - "Pax Rio Verde"
       vars:
-        XCODE_WORKSPACE: "iosApp/iosApp.xcworkspace"
+        # Removi as variáveis estáticas de caminho para usar a busca automática abaixo
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
     scripts:
@@ -19,7 +19,6 @@ workflows:
 
       - name: Install Manual Certificate
         script: |
-          # Limpeza do Base64 e instalação do P12 (Step 4 que já deu certo)
           echo "$CERTIFICATE_P12" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
@@ -28,9 +27,13 @@ workflows:
 
       - name: Build iOS App
         script: |
-          # O Xcode vai tentar assinar usando o certificado que instalamos acima
+          # 1. Busca automática pelo arquivo de workspace do Xcode
+          WORKSPACE_PATH=$(find . -name "*.xcworkspace" | head -n 1)
+          echo "Workspace encontrado em: $WORKSPACE_PATH"
+          
+          # 2. Executa o build usando o caminho real encontrado
           xcode-project build-ipa \
-            --workspace "$XCODE_WORKSPACE" \
+            --workspace "$WORKSPACE_PATH" \
             --scheme "$XCODE_SCHEME"
 
     artifacts:
