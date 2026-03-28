@@ -16,16 +16,16 @@ workflows:
         script: |
           keychain initialize
           
-          # 1. Força a criação do arquivo físico da chave para garantir a leitura
-          echo "$APP_STORE_CONNECT_PRIVATE_KEY" > ./private_key.p8
-          
-          # 2. Busca e cria os arquivos usando o arquivo físico como referência
+          # 1. Criar o arquivo da chave preservando as quebras de linha corretamente
+          cat <<EOF > ./private_key.p8
+          $APP_STORE_CONNECT_PRIVATE_KEY
+          EOF
+
+          # 2. Comando simplificado: Deixe o Codemagic usar as variáveis de ambiente automaticamente
+          # Ele já sabe ler as variáveis APP_STORE_CONNECT_... se o nome estiver correto
           app-store-connect fetch-signing-files "br.com.paxrioverde.app" \
             --type IOS_APP_DEVELOPMENT \
-            --create \
-            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
-            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --private-key ./private_key.p8
+            --create
           
           keychain add-certificates
       - name: Build Kotlin Shared Module
