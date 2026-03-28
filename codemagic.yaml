@@ -16,12 +16,18 @@ workflows:
         script: |
           keychain initialize
           
-          # Limpeza de perfis locais antigos para evitar conflitos
-          rm -f ~/Library/MobileDevice/Provisioning\ Profiles/*
-          
-          # Comando para buscar e criar o certificado do zero
-          # O --create garante que, se não houver um certificado com chave privada local, 
-          # ele tentará gerar um novo no portal da Apple.
+          # DIAGNÓSTICO (Isso vai aparecer no seu log)
+          echo "=== DIAGNÓSTICO DE VARIÁVEIS ==="
+          if [ -z "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then 
+            echo "ERRO CRÍTICO: A variável PRIVATE_KEY está VAZIA ou o Grupo 'Pax Rio Verde' não foi carregado."; 
+          else 
+            echo "OK: A variável PRIVATE_KEY foi detectada."; 
+            # Verifica se o formato básico do arquivo .p8 está correto
+            echo "$APP_STORE_CONNECT_PRIVATE_KEY" | grep -q "BEGIN PRIVATE KEY" && echo "OK: Formato da chave parece válido." || echo "ERRO: Texto da chave está incompleto ou sem cabeçalho."
+          fi
+          echo "================================"
+
+          # LIMPEZA E BUSCA
           app-store-connect fetch-signing-files "br.com.paxrioverde.app" \
             --type IOS_APP_DEVELOPMENT \
             --create
