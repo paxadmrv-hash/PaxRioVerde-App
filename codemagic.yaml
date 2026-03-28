@@ -19,18 +19,20 @@ workflows:
 
       - name: Install Manual Certificate
         script: |
-          # Limpeza total do Base64 vindo do Windows
+          # Limpa e decodifica o P12 da Natalia
           echo "$CERTIFICATE_P12" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > /tmp/certificate.p12
           
-          # Importa o certificado que você gerou no seu PC
+          # Instala no Mac forçando a vinculação da chave privada
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
       - name: Fetch Provisioning Profiles
         script: |
-          # Comando simplificado: foca em buscar o perfil de desenvolvimento
-          # sem tentar gerenciar certificados automaticamente
+          # AQUI ESTÁ O PULO DO GATO:
+          # --no-fetch-certificates: Impede o Codemagic de tentar baixar certificados da Apple.
+          # Ele será obrigado a usar o que instalamos no passo anterior.
           app-store-connect fetch-signing-files "$APP_ID" \
             --type IOS_APP_DEVELOPMENT \
+            --no-fetch-certificates \
             --create
 
       - name: Build Kotlin Shared Module
@@ -38,7 +40,7 @@ workflows:
 
       - name: Build iOS App
         script: |
-          # O segredo: forçamos o Xcode a usar o certificado que instalamos manualmente
+          # Forçamos o Xcode a usar o certificado que está no Keychain
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME"
