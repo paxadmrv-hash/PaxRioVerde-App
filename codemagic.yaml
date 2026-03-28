@@ -15,11 +15,10 @@ workflows:
       - name: Initialize Keychain & Fetch Signing
         script: |
           keychain initialize
-          # Adicionada a flag --include-certificate-key abaixo (Obrigatório para funcionar)
+          # Removemos a flag que causou erro e mantemos o --create para gerar o certificado
           app-store-connect fetch-signing-files "br.com.paxrioverde.app" \
             --type IOS_APP_DEVELOPMENT \
-            --create \
-            --include-certificate-key
+            --create
           keychain add-certificates
       - name: Build Kotlin Shared Module
         script: ./gradlew :composeApp:assembleDebug
