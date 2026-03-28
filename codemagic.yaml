@@ -16,21 +16,16 @@ workflows:
         script: |
           keychain initialize
           
-          # TESTE 1: Formatação da Chave
-          echo "=== QUANTAS LINHAS TEM A SUA CHAVE? ==="
-          echo "$APP_STORE_CONNECT_PRIVATE_KEY" | wc -l
-          echo "(Se o número acima for 1, a chave perdeu as quebras de linha e o build sempre vai falhar!)"
-          echo "======================================="
+          # 1. Força a criação do arquivo físico da chave para garantir a leitura
+          echo "$APP_STORE_CONNECT_PRIVATE_KEY" > ./private_key.p8
           
-          # TESTE 2: O Fantasma da Apple
-          echo "=== CERTIFICADOS QUE O CODEMAGIC ESTÁ VENDO NA APPLE ==="
-          app-store-connect certificates list
-          echo "========================================================"
-
-          # LIMPEZA E BUSCA
+          # 2. Busca e cria os arquivos usando o arquivo físico como referência
           app-store-connect fetch-signing-files "br.com.paxrioverde.app" \
             --type IOS_APP_DEVELOPMENT \
-            --create
+            --create \
+            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --private-key ./private_key.p8
           
           keychain add-certificates
       - name: Build Kotlin Shared Module
