@@ -13,27 +13,32 @@ workflows:
     scripts:
       - name: Set gradlew permissions
         script: chmod +x gradlew
+
       - name: Initialize Keychain
         script: keychain initialize
+
       - name: Install Manual Certificate
         script: |
-          # Limpa o Base64 de espaços e quebras de linha invisíveis
-          echo "$CERTIFICATE_P12" | tr -d '\n\r ' | base64 --decode > /tmp/certificate.p12
+          # 1. Decodifica limpando sujeira de texto do Windows
+          echo "$CERTIFICATE_P12" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > /tmp/certificate.p12
           
-          # Importa para o Mac do Codemagic
-          keychain add-certificates \
-            --certificate /tmp/certificate.p12 \
-            --certificate-password "$CERTIFICATE_PASSWORD"
+          # 2. Instala o certificado e a chave no Keychain padrão
+          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
+
       - name: Fetch Provisioning Profiles
         script: |
-          # Agora ele deve reconhecer a Chave Privada no Keychain
+          # 3. MUDANÇA: Vamos baixar APENAS o Profile, sem tentar criar ou salvar certificados novos
           app-store-connect fetch-signing-files "$APP_ID" \
             --type IOS_APP_DEVELOPMENT \
+            --no-save-certificates \
             --create
+
       - name: Build Kotlin Shared Module
         script: ./gradlew :composeApp:assembleDebug
+
       - name: Build iOS App
         script: |
+          # 4. Compila usando o que já está instalado no Keychain
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME"
