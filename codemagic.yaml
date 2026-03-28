@@ -19,18 +19,18 @@ workflows:
 
       - name: Install Manual Certificate
         script: |
-          # 1. Decodifica limpando sujeira de texto do Windows
+          # Limpeza total do Base64 vindo do Windows
           echo "$CERTIFICATE_P12" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > /tmp/certificate.p12
           
-          # 2. Instala o certificado e a chave no Keychain padrão
+          # Importa o certificado que você gerou no seu PC
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
       - name: Fetch Provisioning Profiles
         script: |
-          # 3. MUDANÇA: Vamos baixar APENAS o Profile, sem tentar criar ou salvar certificados novos
+          # Comando simplificado: foca em buscar o perfil de desenvolvimento
+          # sem tentar gerenciar certificados automaticamente
           app-store-connect fetch-signing-files "$APP_ID" \
             --type IOS_APP_DEVELOPMENT \
-            --no-save-certificates \
             --create
 
       - name: Build Kotlin Shared Module
@@ -38,10 +38,11 @@ workflows:
 
       - name: Build iOS App
         script: |
-          # 4. Compila usando o que já está instalado no Keychain
+          # O segredo: forçamos o Xcode a usar o certificado que instalamos manualmente
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME"
+
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
