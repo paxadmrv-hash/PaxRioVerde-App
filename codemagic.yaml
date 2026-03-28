@@ -17,16 +17,16 @@ workflows:
         script: keychain initialize
       - name: Install Manual Certificate
         script: |
-          # Decodifica removendo possíveis espaços
+          # Limpa o Base64 de espaços e quebras de linha invisíveis
           echo "$CERTIFICATE_P12" | tr -d '\n\r ' | base64 --decode > /tmp/certificate.p12
           
-          # Importa com senha e força a confiança do sistema
+          # Importa para o Mac do Codemagic
           keychain add-certificates \
             --certificate /tmp/certificate.p12 \
             --certificate-password "$CERTIFICATE_PASSWORD"
       - name: Fetch Provisioning Profiles
         script: |
-          # O fetch agora deve encontrar a chave privada instalada no passo anterior
+          # Agora ele deve reconhecer a Chave Privada no Keychain
           app-store-connect fetch-signing-files "$APP_ID" \
             --type IOS_APP_DEVELOPMENT \
             --create
@@ -39,3 +39,7 @@ workflows:
             --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
+    publishing:
+      email:
+        recipients:
+          - paxadmrv@gmail.com
