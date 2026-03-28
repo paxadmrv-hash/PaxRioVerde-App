@@ -16,16 +16,16 @@ workflows:
         script: |
           keychain initialize
           
-          # DIAGNÓSTICO (Isso vai aparecer no seu log)
-          echo "=== DIAGNÓSTICO DE VARIÁVEIS ==="
-          if [ -z "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then 
-            echo "ERRO CRÍTICO: A variável PRIVATE_KEY está VAZIA ou o Grupo 'Pax Rio Verde' não foi carregado."; 
-          else 
-            echo "OK: A variável PRIVATE_KEY foi detectada."; 
-            # Verifica se o formato básico do arquivo .p8 está correto
-            echo "$APP_STORE_CONNECT_PRIVATE_KEY" | grep -q "BEGIN PRIVATE KEY" && echo "OK: Formato da chave parece válido." || echo "ERRO: Texto da chave está incompleto ou sem cabeçalho."
-          fi
-          echo "================================"
+          # TESTE 1: Formatação da Chave
+          echo "=== QUANTAS LINHAS TEM A SUA CHAVE? ==="
+          echo "$APP_STORE_CONNECT_PRIVATE_KEY" | wc -l
+          echo "(Se o número acima for 1, a chave perdeu as quebras de linha e o build sempre vai falhar!)"
+          echo "======================================="
+          
+          # TESTE 2: O Fantasma da Apple
+          echo "=== CERTIFICADOS QUE O CODEMAGIC ESTÁ VENDO NA APPLE ==="
+          app-store-connect certificates list
+          echo "========================================================"
 
           # LIMPEZA E BUSCA
           app-store-connect fetch-signing-files "br.com.paxrioverde.app" \
