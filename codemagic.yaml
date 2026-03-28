@@ -15,8 +15,11 @@ workflows:
       - name: Initialize Keychain & Fetch Signing
         script: |
           keychain initialize
-          # Bundle ID atualizado para br.com.paxrioverde.app conforme build.gradle.kts
-          app-store-connect fetch-signing-files "br.com.paxrioverde.app" --type IOS_APP_DEVELOPMENT --create
+          # Adicionada a flag --include-certificate-key abaixo (Obrigatório para funcionar)
+          app-store-connect fetch-signing-files "br.com.paxrioverde.app" \
+            --type IOS_APP_DEVELOPMENT \
+            --create \
+            --include-certificate-key
           keychain add-certificates
       - name: Build Kotlin Shared Module
         script: ./gradlew :composeApp:assembleDebug
