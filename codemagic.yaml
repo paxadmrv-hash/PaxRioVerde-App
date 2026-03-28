@@ -19,28 +19,16 @@ workflows:
 
       - name: Install Manual Certificate
         script: |
-          # Limpa e decodifica o P12 da Natalia
+          # Limpeza do Base64 e instalação do P12 (Step 4 que já deu certo)
           echo "$CERTIFICATE_P12" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > /tmp/certificate.p12
-          
-          # Instala no Mac forçando a vinculação da chave privada
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
-
-      - name: Fetch Provisioning Profiles
-        script: |
-          # AQUI ESTÁ O PULO DO GATO:
-          # --no-fetch-certificates: Impede o Codemagic de tentar baixar certificados da Apple.
-          # Ele será obrigado a usar o que instalamos no passo anterior.
-          app-store-connect fetch-signing-files "$APP_ID" \
-            --type IOS_APP_DEVELOPMENT \
-            --no-fetch-certificates \
-            --create
 
       - name: Build Kotlin Shared Module
         script: ./gradlew :composeApp:assembleDebug
 
       - name: Build iOS App
         script: |
-          # Forçamos o Xcode a usar o certificado que está no Keychain
+          # O Xcode vai tentar assinar usando o certificado que instalamos acima
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME"
