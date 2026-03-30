@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.paxrioverde.util.urlEncode
 
 // CORES PADRÃO DO APP (Pax Rio Verde / Grupo Universo)
 val BrandGreenRefer = Color(0xFF386641)
@@ -46,7 +47,7 @@ fun ReferFriendScreen(onBack: () -> Unit) {
         // Geralmente, "Indicou, Ganhou" envia para o comercial da Pax.
         val whatsappComercial = "55648146-0004"
         val message = "Olá! Gostaria de indicar um amigo para a Pax Rio Verde:\nNome: $friendName\nWhatsApp: $friendPhone"
-        uriHandler.openUri("https://wa.me/$whatsappComercial?text=${message.replace(" ", "%20").replace("\n", "%0A")}")
+        uriHandler.openUri("https://wa.me/$whatsappComercial?text=${urlEncode(message)}")
     }
 
     Column(

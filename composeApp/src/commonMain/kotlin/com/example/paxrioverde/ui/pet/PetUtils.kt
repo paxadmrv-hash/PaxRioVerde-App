@@ -35,7 +35,7 @@ fun calculateHumanAge(species: String, porte: String, years: Int, months: Int): 
         "Gato" -> when (years) { 0 -> 10; 1 -> 15; 2 -> 24; else -> 24 + (years - 2) * 4 }
         "Cão" -> when (porte) {
             "Pequeno" -> when (years) { 0 -> 15; 1 -> 20; 2 -> 24; else -> 24 + (years - 2) * 4 }
-            "Médio" -> when (years) { 0 -> 15; 1 -> 18; 2 -> 23; else -> 23 + (years - 2) * 5 }
+            "Médio" -> when (years) { 0 -> 15; 18 -> 18; 2 -> 23; else -> 23 + (years - 2) * 5 }
             else -> when (years) { 0 -> 12; 1 -> 16; 2 -> 21; else -> 21 + (years - 2) * 6 }
         }
         else -> 0
@@ -87,4 +87,20 @@ fun ByteArray.toBase64(): String {
         i += 3
     }
     return output.toString()
+}
+
+/**
+ * Codifica uma string para ser usada em uma URL (CommonMain)
+ */
+fun urlEncode(text: String): String {
+    val allowedChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
+    return text.encodeToByteArray().joinToString("") { byte ->
+        val code = byte.toInt() and 0xFF
+        val char = code.toChar()
+        if (char in allowedChars) {
+            char.toString()
+        } else {
+            "%" + code.toString(16).uppercase().padStart(2, '0')
+        }
+    }
 }

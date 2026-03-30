@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.paxrioverde.util.urlEncode
 import org.jetbrains.compose.resources.painterResource
 import paxrioverde.composeapp.generated.resources.Res
 import paxrioverde.composeapp.generated.resources.med_foto
@@ -146,7 +147,7 @@ fun MedSaudeScreen(onBackClick: () -> Unit) {
                     Button(
                         onClick = {
                             val mensagem = "Olá, gostaria de agendar uma consulta com ${prof.nome}."
-                            uriHandler.openUri("https://wa.me/$whatsappMed?text=${mensagem.replace(" ", "%20")}")
+                            uriHandler.openUri("https://wa.me/$whatsappMed?text=${urlEncode(mensagem)}")
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366)),
                         shape = RoundedCornerShape(12.dp)

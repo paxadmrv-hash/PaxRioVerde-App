@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.paxrioverde.util.urlEncode
 import org.jetbrains.compose.resources.painterResource
 import paxrioverde.composeapp.generated.resources.*
 
@@ -133,7 +134,7 @@ fun ExamesLaboratoriaisScreen(onBack: () -> Unit) {
                     Button(
                         onClick = {
                             val msg = "Olá, gostaria de um orçamento para exames laboratoriais."
-                            uriHandler.openUri("https://wa.me/$whatsappNumber?text=${msg.replace(" ", "%20")}")
+                            uriHandler.openUri("https://wa.me/$whatsappNumber?text=${urlEncode(msg)}")
                         },
                         modifier = Modifier.fillMaxWidth().height(60.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = WhatsAppColor),
@@ -227,8 +228,7 @@ fun HeaderSection(onBack: () -> Unit) {
 fun ExameRow(nome: String) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+        verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.CheckCircle, null, tint = BrandGreenMain.copy(alpha = 0.2f), modifier = Modifier.size(20.dp))
         Spacer(modifier = Modifier.width(16.dp))
         Text(nome, fontSize = 15.sp, color = Color(0xFF34495E), fontWeight = FontWeight.Medium)
