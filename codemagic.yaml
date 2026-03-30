@@ -19,11 +19,11 @@ workflows:
 
       - name: Install Manual Certificate and Profile
         script: |
-          # 1. Instala o Certificado P12
+          # 1. Install P12 Certificate
           echo "$CERTIFICATE_P12" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
-          # 2. Instala o Provisioning Profile (O que você baixou da Apple)
+          # 2. Install Provisioning Profile in the correct Apple directory
           PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_HOME"
           echo "$PROVISIONING_PROFILE" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > "$PROFILES_HOME/pax.mobileprovision"
@@ -33,7 +33,7 @@ workflows:
 
       - name: Build iOS App
         script: |
-          # CRIANDO O ARQUIVO EXPORT_OPTIONS (EM INGLÊS!)
+          # 3. Create Export Options file (MUST BE IN ENGLISH)
           cat <<EOF > /Users/builder/export_options.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -50,12 +50,13 @@ workflows:
               <key>provisioningProfiles</key>
               <dict>
                   <key>br.com.paxrioverde.app</key>
-                  <string>pax</string>
+                  <string>Perfil de desenvolvedor Pax_Rio_Verde</string>
               </dict>
           </dict>
           </plist>
           EOF
 
+          # 4. Execute IPA Build
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME" \
