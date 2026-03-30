@@ -7,7 +7,6 @@ workflows:
       groups:
         - "Pax Rio Verde"
       vars:
-        # Caminho extraído do seu print do GitHub
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
@@ -18,19 +17,23 @@ workflows:
       - name: Initialize Keychain
         script: keychain initialize
 
-      - name: Install Manual Certificate
+      - name: Install Manual Certificate and Profile
         script: |
-          # Limpa o Base64 e instala o certificado da Natalia
+          # 1. Instala o Certificado P12
           echo "$CERTIFICATE_P12" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
+
+          # 2. Instala o Provisioning Profile no diretório nativo da Apple
+          PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILES_HOME"
+          echo "$PROVISIONING_PROFILE" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > "$PROFILES_HOME/pax.mobileprovision"
 
       - name: Build Kotlin Shared Module
         script: ./gradlew :composeApp:assembleDebug
 
       - name: Build iOS App
         script: |
-          # 1. CRIANDO O ARQUIVO DE EXPORTAÇÃO (O que estava faltando)
-          # Usando o Team ID: 264TWUW2L6 do seu certificado
+          # Criando o arquivo Export Options
           cat <<EOF > /Users/builder/export_options.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -48,8 +51,6 @@ workflows:
           </plist>
           EOF
 
-          # 2. EXECUTANDO O BUILD IPA
-          # Apontando para o arquivo .plist criado acima
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME" \
