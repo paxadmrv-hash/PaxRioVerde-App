@@ -23,7 +23,7 @@ workflows:
           echo "$CERTIFICATE_P12" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
-          # 2. Instala o Provisioning Profile no diretório nativo da Apple
+          # 2. Instala o Provisioning Profile (O que você baixou da Apple)
           PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_HOME"
           echo "$PROVISIONING_PROFILE" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > "$PROFILES_HOME/pax.mobileprovision"
@@ -33,7 +33,7 @@ workflows:
 
       - name: Build iOS App
         script: |
-          # Criando o arquivo Export Options
+          # CRIANDO O ARQUIVO EXPORT_OPTIONS (EM INGLÊS!)
           cat <<EOF > /Users/builder/export_options.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -47,6 +47,11 @@ workflows:
               <string>264TWUW2L6</string>
               <key>compileBitcode</key>
               <false/>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>br.com.paxrioverde.app</key>
+                  <string>pax</string>
+              </dict>
           </dict>
           </plist>
           EOF
