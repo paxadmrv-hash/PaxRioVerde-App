@@ -9,6 +9,7 @@ workflows:
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
+        # Forçamos o ID que está no seu Perfil de Provisionamento
         APP_ID: "br.com.paxrioverde.app"
     scripts:
       - name: Set gradlew permissions
@@ -19,11 +20,11 @@ workflows:
 
       - name: Install Manual Certificate and Profile
         script: |
-          # 1. Install Certificate
+          # 1. Instalar Certificado P12
           echo "$CERTIFICATE_P12" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
-          # 2. Install Profile using the exact UUID from your file
+          # 2. Instalar Perfil usando o UUID exato (da5556db...)
           PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_HOME"
           echo "$PROVISIONING_PROFILE" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > "$PROFILES_HOME/da5556db-7d84-4644-8e18-2adc18c21df2.mobileprovision"
@@ -33,7 +34,7 @@ workflows:
 
       - name: Build iOS App
         script: |
-          # 3. Create Export Options
+          # 3. Criar Export Options para o método Development
           cat <<EOF > /Users/builder/export_options.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -56,17 +57,18 @@ workflows:
           </plist>
           EOF
 
-          # 4. Build IPA forcing the profile UUID directly
+          # 4. Arquivar o Projeto forçando o PRODUCT_BUNDLE_IDENTIFIER correto
           xcodebuild -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -archivePath build/ios/xcarchive/pax.xcarchive \
             archive \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM=264TWUW2L6 \
+            PRODUCT_BUNDLE_IDENTIFIER="br.com.paxrioverde.app" \
             PROVISIONING_PROFILE_SPECIFIER="da5556db-7d84-4644-8e18-2adc18c21df2" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-          # 5. Export the IPA
+          # 5. Exportar o IPA final
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/pax.xcarchive \
             -exportOptionsPlist /Users/builder/export_options.plist \
