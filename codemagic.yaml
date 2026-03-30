@@ -19,22 +19,26 @@ workflows:
 
       - name: Install Manual Certificate and Profile
         script: |
-          # 1. Install P12 Certificate
+          # 1. Install Certificate
           echo "$CERTIFICATE_P12" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
-          # 2. Install Provisioning Profile (Using the correct folder)
+          # 2. Install Provisioning Profile
           PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_HOME"
-          # Decodes the profile and saves it
           echo "$PROVISIONING_PROFILE" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > "$PROFILES_HOME/pax.mobileprovision"
+
+      - name: Prepare Xcode Project Signing
+        script: |
+          # 3. Force Xcode to use the manual profile we installed
+          xcode-project use-profiles --project "$XCODE_PROJECT"
 
       - name: Build Kotlin Shared Module
         script: ./gradlew :composeApp:assembleDebug
 
       - name: Build iOS App
         script: |
-          # 3. Create Export Options (MUST STAY IN ENGLISH)
+          # 4. Create Export Options
           cat <<EOF > /Users/builder/export_options.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -57,7 +61,7 @@ workflows:
           </plist>
           EOF
 
-          # 4. Final IPA Build Command
+          # 5. Build IPA forcing parameters to override project settings
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME" \
