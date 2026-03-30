@@ -44,4 +44,12 @@ actual class SessionManager actual constructor() {
     actual fun clearPassword() {
         userDefaults.removeObjectForKey("saved_password")
     }
+
+    actual fun getSavedPetsJson(): String {
+        return userDefaults.stringForKey("saved_pets_json") ?: ""
+    }
+
+    actual fun savePetsJson(json: String) {
+        userDefaults.setObject(json, "saved_pets_json")
+    }
 }
