@@ -12,14 +12,14 @@ import org.jetbrains.compose.resources.painterResource
 
 @Composable
 actual fun AsyncImageWrapper(
-    uri: String,
+    uri: String?,
     placeholder: org.jetbrains.compose.resources.DrawableResource,
     modifier: Modifier
 ) {
     var imageBitmap by remember(uri) { mutableStateOf<ImageBitmap?>(null) }
 
     LaunchedEffect(uri) {
-        if (uri.startsWith("data:image")) {
+        if (uri != null && uri.startsWith("data:image")) {
             try {
                 val base64String = uri.substringAfter("base64,")
                 val imageBytes = Base64.decode(base64String, Base64.DEFAULT)
@@ -28,6 +28,8 @@ actual fun AsyncImageWrapper(
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        } else {
+            imageBitmap = null
         }
     }
 

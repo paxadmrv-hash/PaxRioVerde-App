@@ -437,4 +437,4 @@ fun PlanCoverageCard(benefits: List<PetBenefit>) {
 }
 
 @Composable
-expect fun AsyncImageWrapper(uri: String, placeholder: org.jetbrains.compose.resources.DrawableResource, modifier: Modifier)
+expect fun AsyncImageWrapper(uri: String?, placeholder: org.jetbrains.compose.resources.DrawableResource, modifier: Modifier)
