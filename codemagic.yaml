@@ -19,8 +19,8 @@ workflows:
 
       - name: Install Distribution Certificate and Profile
         script: |
-          echo "$CERTIFICATE_P12" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > /tmp/certificate.p12
-          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
+          echo "$CERTIFICATE_P12" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > /tmp/certificate.12
+          keychain add-certificates --certificate /tmp/certificate.12 --certificate-password "$CERTIFICATE_PASSWORD"
 
           PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_HOME"
@@ -73,7 +73,7 @@ workflows:
         auth: integration
         issuer_id: $APP_STORE_CONNECT_ISSUER_ID
         key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        private_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        private_key: '$APP_STORE_CONNECT_PRIVATE_KEY'
       email:
         recipients:
           - paxadmrv@gmail.com
