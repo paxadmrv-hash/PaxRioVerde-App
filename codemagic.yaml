@@ -70,10 +70,15 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: 193373d2-ebed-4c09-b40a-50455ed869cd
+        key_id: 895DQXT972
         private_key: |
-          $APP_STORE_CONNECT_PRIVATE_KEY
+          -----BEGIN PRIVATE KEY-----
+          MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgI/5XiZE95LqY6ojL
+          iEStQA1QNj7bbYVIa5bQDXMCQiWgCgYIKoZIzj0DAQehRANCAAQrKcNO1nWX4vLf
+          zqlIMfYiHZxw7BQHlaBAjiVozFiZFr0tzl4s3aSPVQ59GuJRchTmhGrX9gPaLtLS
+          l8zGNhiG
+          -----END PRIVATE KEY-----
       email:
         recipients:
           - paxadmrv@gmail.com
