@@ -19,11 +19,9 @@ workflows:
 
       - name: Install Distribution Certificate and Profile
         script: |
-          # 1. Instalar Certificado de DISTRIBUIÇÃO P12
           echo "$CERTIFICATE_P12" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
-          # 2. Instalar Perfil APP STORE (UUID: a83f217a-ab8f-44e5-b734-ea1e1d5ef980)
           PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_HOME"
           echo "$PROVISIONING_PROFILE" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > "$PROFILES_HOME/a83f217a-ab8f-44e5-b734-ea1e1d5ef980.mobileprovision"
@@ -33,7 +31,6 @@ workflows:
 
       - name: Build iOS App for Store
         script: |
-          # 3. Export Options para App Store
           cat <<EOF > /Users/builder/export_options.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -54,7 +51,6 @@ workflows:
           </plist>
           EOF
 
-          # 4. Arquivar o Projeto para Produção
           xcodebuild -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -archivePath build/ios/xcarchive/pax.xcarchive \
@@ -64,7 +60,6 @@ workflows:
             PRODUCT_BUNDLE_IDENTIFIER="br.com.paxrioverde.app" \
             PROVISIONING_PROFILE_SPECIFIER="a83f217a-ab8f-44e5-b734-ea1e1d5ef980"
 
-          # 5. Exportar IPA Final
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/pax.xcarchive \
             -exportOptionsPlist /Users/builder/export_options.plist \
