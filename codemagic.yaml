@@ -33,7 +33,7 @@ workflows:
 
       - name: Build iOS App for Store
         script: |
-          # 3. Export Options para App Store
+          # 3. Criar Export Options para App Store
           cat <<EOF > /Users/builder/export_options.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -54,7 +54,7 @@ workflows:
           </plist>
           EOF
 
-          # 4. Arquivar o Projeto para Produção
+          # 4. Arquivar o Projeto (Forçando Bundle ID e Perfil de Produção)
           xcodebuild -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -archivePath build/ios/xcarchive/pax.xcarchive \
@@ -64,7 +64,7 @@ workflows:
             PRODUCT_BUNDLE_IDENTIFIER="br.com.paxrioverde.app" \
             PROVISIONING_PROFILE_SPECIFIER="a83f217a-ab8f-44e5-b734-ea1e1d5ef980"
 
-          # 5. Exportar IPA Final
+          # 5. Exportar o IPA final
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/pax.xcarchive \
             -exportOptionsPlist /Users/builder/export_options.plist \
