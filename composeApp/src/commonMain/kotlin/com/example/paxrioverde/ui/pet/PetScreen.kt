@@ -177,6 +177,16 @@ fun MundoPetScreen(onBack: () -> Unit, idcliente: Int, idcontrato: Int, idconven
                             scope.launch { snackbarHostState.showSnackbar("Data incompleta") }
                             return@Button
                         }
+
+                        val day = editBirthDate.substring(0, 2).toIntOrNull() ?: 0
+                        val month = editBirthDate.substring(2, 4).toIntOrNull() ?: 0
+                        val year = editBirthDate.substring(4, 8).toIntOrNull() ?: 0
+
+                        if (!isValidDate(day, month, year)) {
+                            scope.launch { snackbarHostState.showSnackbar("Data de nascimento inválida") }
+                            return@Button
+                        }
+
                         isSaving = true
                         val formattedDate = "${editBirthDate.substring(0,2)}/${editBirthDate.substring(2,4)}/${editBirthDate.substring(4,8)}"
                         val petData = PetItem(
