@@ -23,17 +23,17 @@ workflows:
           echo "$CERTIFICATE_P12" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
-          # 2. Instalar o NOVO Perfil (UUID: 5806e23b-0b0a-41e5-b285-3705a2b31e3e)
+          # 2. Instalar o NOVO Perfil (UUID extraído do arquivo Pax_Rio_Verde_NOVO)
           PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_HOME"
-          echo "$PROVISIONING_PROFILE" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > "$PROFILES_HOME/5806e23b-0b0a-41e5-b285-3705a2b31e3e.mobileprovision"
+          echo "$PROVISIONING_PROFILE" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > "$PROFILES_HOME/4de931fb-f6d3-4574-a84e-d24babf20556.mobileprovision"
 
       - name: Build Kotlin Shared Module
         script: ./gradlew :composeApp:assembleDebug
 
       - name: Build iOS App
         script: |
-          # 3. Criar Export Options com o NOVO UUID
+          # 3. Criar Export Options com o Novo UUID (4de931fb...)
           cat <<EOF > /Users/builder/export_options.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -50,13 +50,13 @@ workflows:
               <key>provisioningProfiles</key>
               <dict>
                   <key>br.com.paxrioverde.app</key>
-                  <string>5806e23b-0b0a-41e5-b285-3705a2b31e3e</string>
+                  <string>4de931fb-f6d3-4574-a84e-d24babf20556</string>
               </dict>
           </dict>
           </plist>
           EOF
 
-          # 4. Arquivar o Projeto forçando o NOVO Perfil
+          # 4. Arquivar o Projeto forçando o NOVO Perfil e Bundle ID
           xcodebuild -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -archivePath build/ios/xcarchive/pax.xcarchive \
@@ -64,7 +64,7 @@ workflows:
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM=264TWUW2L6 \
             PRODUCT_BUNDLE_IDENTIFIER="br.com.paxrioverde.app" \
-            PROVISIONING_PROFILE_SPECIFIER="5806e23b-0b0a-41e5-b285-3705a2b31e3e" \
+            PROVISIONING_PROFILE_SPECIFIER="4de931fb-f6d3-4574-a84e-d24babf20556" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES
 
           # 5. Exportar o IPA final
