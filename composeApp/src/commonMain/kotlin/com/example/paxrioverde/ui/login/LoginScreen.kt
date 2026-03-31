@@ -195,7 +195,7 @@ fun LoginScreen(
                                 }
                             } catch (e: Exception) {
                                 isLoading = false
-                                errorMessage = "Erro de conexão: ${e.message}"
+                                errorMessage = "Erro de conexão. Verifique sua internet."
                                 println("Erro login: ${e.message}")
                             }
                         }
