@@ -19,23 +19,23 @@ workflows:
 
       - name: Install Certificates
         script: |
-          # Aqui instalamos o seu novo .p12 gerado no OpenSSL
+          # Instalamos o .p12 que você gerou no OpenSSL
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
-      - name: Fetch signing files from Apple
+      - name: Download Provisioning Profiles
         script: |
-          # O SEGREDO: Usamos --profiles-only para ele não reclamar da private key
-          app-store-connect fetch-signing-files "$APP_ID" \
-            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
-            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
-            --type IOS_APP_STORE \
-            --profiles-only \
-            --create
+          # Em vez de fetch-signing-files, baixamos os perfis diretamente
+          # Isso evita que o Codemagic tente gerenciar chaves privadas que ele não tem
+          app-store-connect profiles list --bundle-id "$APP_ID" --filter-profile-type IOS_APP_STORE --limit 1
+
+          # Comando para baixar o perfil para a pasta correta do Xcode
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          app-store-connect profiles download --bundle-id "$APP_ID" --filter-profile-type IOS_APP_STORE
 
       - name: Build iOS App (IPA)
         script: |
+          # Agora o Xcode vai encontrar o Certificado (no keychain) e o Profile (na pasta acima)
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
