@@ -5,7 +5,7 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - "Pax Rio Verde" # Certifique-se de que este nome está idêntico ao do painel
+        - "Pax Rio Verde" # Certifique-se de que o nome do grupo está exatamente assim
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
@@ -40,11 +40,10 @@ workflows:
 
     publishing:
       app_store_connect:
-        # Estes 3 campos são obrigatórios quando não se usa 'auth: integration'
+        # Estes 3 campos resolvem o erro de "campos obrigatórios"
         issuer_id: $APP_STORE_CONNECT_ISSUER_ID
         key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        private_key:
-          $APP_STORE_CONNECT_PRIVATE_KEY
+        private_key: $APP_STORE_CONNECT_PRIVATE_KEY
       email:
         recipients:
           - paxadmrv@gmail.com
