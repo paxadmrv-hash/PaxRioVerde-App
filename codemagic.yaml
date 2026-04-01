@@ -17,24 +17,19 @@ workflows:
       - name: Initialize Keychain
         script: keychain initialize
 
-      - name: Install Certificates
+      - name: Install Certificate and Profile
         script: |
-          # Instalando o .p12 gerado via OpenSSL
+          # 1. Instala o Certificado .p12
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
-
-      - name: Fetch signing files
-        script: |
-          # Usamos apenas o fetch sem flags extras para ele baixar o profile
-          # O Xcode fará o "match" automático com o certificado instalado acima
-          app-store-connect fetch-signing-files "$APP_ID" \
-            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
-            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
-            --type IOS_APP_STORE
+          
+          # 2. Instala o Provisioning Profile manualmente na pasta do Xcode
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/pax_rio_verde.mobileprovision
 
       - name: Build iOS App (IPA)
         script: |
+          # O build-ipa agora encontrará tudo pronto no sistema
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
