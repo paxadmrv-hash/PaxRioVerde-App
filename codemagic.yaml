@@ -5,7 +5,7 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - "Pax Rio Verde"
+        - "Pax Rio Verde" # O Codemagic vai buscar as chaves aqui
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
@@ -17,60 +17,34 @@ workflows:
       - name: Initialize Keychain
         script: keychain initialize
 
-      - name: Install Distribution Certificate and Profile
+      - name: Fetch signing files from Apple
         script: |
-          echo "$CERTIFICATE_P12" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > /tmp/certificate.p12
-          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
+          # Este comando usa as variáveis do seu grupo para baixar os certificados
+          app-store-connect fetch-signing-files "$APP_ID" \
+            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            --type IOS_APP_STORE \
+            --create
 
-          PROFILES_HOME="$HOME/Library/MobileDevice/Provisioning Profiles"
-          mkdir -p "$PROFILES_HOME"
-          echo "$PROVISIONING_PROFILE" | tr -dc 'A-Za-z0-9+/=' | base64 --decode > "$PROFILES_HOME/a83f217a-ab8f-44e5-b734-ea1e1d5ef980.mobileprovision"
-
-      - name: Build Kotlin Shared Module
-        script: ./gradlew :composeApp:assembleDebug
+      - name: Install certificates
+        script: keychain add-certificates
 
       - name: Build iOS App for Store
         script: |
-          cat <<EOF > /Users/builder/export_options.plist
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>app-store</string>
-              <key>signingStyle</key>
-              <string>manual</string>
-              <key>teamID</key>
-              <string>264TWUW2L6</string>
-              <key>provisioningProfiles</key>
-              <dict>
-                  <key>br.com.paxrioverde.app</key>
-                  <string>a83f217a-ab8f-44e5-b734-ea1e1d5ef980</string>
-              </dict>
-          </dict>
-          </plist>
-          EOF
-
-          xcodebuild -project "$XCODE_PROJECT" \
-            -scheme "$XCODE_SCHEME" \
-            -archivePath build/ios/xcarchive/pax.xcarchive \
-            archive \
-            CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM=264TWUW2L6 \
-            PRODUCT_BUNDLE_IDENTIFIER="br.com.paxrioverde.app" \
-            PROVISIONING_PROFILE_SPECIFIER="a83f217a-ab8f-44e5-b734-ea1e1d5ef980"
-
-          xcodebuild -exportArchive \
-            -archivePath build/ios/xcarchive/pax.xcarchive \
-            -exportOptionsPlist /Users/builder/export_options.plist \
-            -exportPath build/ios/ipa
+          xcode-project build-ipa \
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
 
     artifacts:
       - build/ios/ipa/*.ipa
 
     publishing:
       app_store_connect:
-        auth: integration
+        # Aqui fornecemos as chaves manualmente para não depender da integração do painel
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+
       email:
         recipients:
           - paxadmrv@gmail.com
