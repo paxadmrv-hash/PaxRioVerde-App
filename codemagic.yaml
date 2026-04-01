@@ -9,6 +9,7 @@ workflows:
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
+        # 1. CERTIFIQUE-SE QUE ESTE BUNDLE ID É O MESMO DO PORTAL DA APPLE
         APP_ID: "br.com.paxrioverde.app"
         PROV_UUID: "e7d29ce1-af82-4384-b842-b13548f9637c"
     scripts:
@@ -56,12 +57,13 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
           
-          # Adicionamos COMPILER_INDEX_STORE_ENABLE=NO e dead_strip para evitar o crash do Linker (Bus error 10)
+          # Forçamos o PRODUCT_BUNDLE_IDENTIFIER para garantir que não vá como "com.example"
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -archivePath build/ios/xcarchive/app.xcarchive \
+            PRODUCT_BUNDLE_IDENTIFIER="$APP_ID" \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE="$PROV_UUID" \
