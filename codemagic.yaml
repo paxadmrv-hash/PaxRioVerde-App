@@ -11,7 +11,6 @@ workflows:
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
         PROV_UUID: "e7d29ce1-af82-4384-b842-b13548f9637c"
-        # NOME DO PERFIL EXATAMENTE COMO ESTÁ NO PORTAL DA APPLE
         PROV_NAME: "Pax_Rio_Verde_Producao"
     scripts:
       - name: Set gradlew permissions
@@ -29,11 +28,11 @@ workflows:
           mkdir -p "$PROFILES_DIR"
           echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
           
-          echo "export CODE_SIGN_IDENTITY=\"Apple Distribution\"" >> $CM_ENV
+          # Tentaremos usar a identidade mais abrangente para casar com o perfil
+          echo "export CODE_SIGN_IDENTITY=\"iPhone Distribution\"" >> $CM_ENV
 
       - name: Create Export Options
         script: |
-          # NA EXPORTAÇÃO, O XCODE EXIGE O NOME DO PERFIL (PROV_NAME)
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -50,6 +49,8 @@ workflows:
               </dict>
               <key>signingStyle</key>
               <string>manual</string>
+              <key>compileBitcode</key>
+              <false/>
           </dict>
           </plist>
           EOF
@@ -59,7 +60,6 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
           
-          # Archive - Já sabemos que funciona com o PROV_UUID
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -74,7 +74,6 @@ workflows:
             LD_DEAD_STRIP=YES \
             AD_HOC_CODE_SIGNING_ALLOWED=YES
           
-          # Export - Usando o método atualizado solicitado pelo Xcode (app-store-connect)
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
