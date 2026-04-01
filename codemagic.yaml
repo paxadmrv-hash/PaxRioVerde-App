@@ -19,33 +19,29 @@ workflows:
 
       - name: Install Certificates
         script: |
-          # Importante: Instala o certificado físico para que a assinatura funcione
+          # Aqui instalamos o seu novo .p12 gerado no OpenSSL
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
       - name: Fetch signing files from Apple
         script: |
-          # Baixa os perfis de provisionamento (Provisioning Profiles)
+          # O SEGREDO: Usamos --profiles-only para ele não reclamar da private key
           app-store-connect fetch-signing-files "$APP_ID" \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
             --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
             --type IOS_APP_STORE \
+            --profiles-only \
             --create
-
-      - name: Refresh Keychain certificates
-        script: keychain add-certificates
 
       - name: Build iOS App (IPA)
         script: |
-          # Compila o app e gera o arquivo para a loja
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
 
       - name: Publish to App Store Connect
         script: |
-          # Realiza o upload manual via script (ignora erros de integração do painel)
           app-store-connect publish \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
