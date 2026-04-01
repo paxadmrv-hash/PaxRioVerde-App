@@ -43,7 +43,8 @@ workflows:
         # Estes 3 campos são obrigatórios quando não se usa 'auth: integration'
         issuer_id: $APP_STORE_CONNECT_ISSUER_ID
         key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        private_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        private_key:
+          $APP_STORE_CONNECT_PRIVATE_KEY
       email:
         recipients:
           - paxadmrv@gmail.com
