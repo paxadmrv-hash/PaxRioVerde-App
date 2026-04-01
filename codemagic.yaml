@@ -10,10 +10,8 @@ workflows:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
-        # O NOVO UUID QUE VOCÊ ENVIOU
+        # O NOVO UUID QUE VOCÊ EXTRAIU DO PERFIL
         PROV_UUID: "032e0993-d821-4efc-ba21-4ae65becb850"
-        # O NOME EXATO DO PERFIL NO PORTAL DA APPLE
-        PROV_NAME: "Pax_Rio_Verde_Producao_Novo"
     scripts:
       - name: Set gradlew permissions
         script: chmod +x gradlew
@@ -28,13 +26,14 @@ workflows:
           
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
-          # Instala usando o novo UUID
+          # Instalando o perfil físico com o UUID como nome de arquivo
           echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
           
           echo "export CODE_SIGN_IDENTITY=\"Apple Distribution\"" >> $CM_ENV
 
       - name: Create Export Options
         script: |
+          # Usamos o UUID diretamente no dicionário de perfis para evitar erro de busca por nome
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -47,7 +46,7 @@ workflows:
               <key>provisioningProfiles</key>
               <dict>
                   <key>$APP_ID</key>
-                  <string>$PROV_NAME</string>
+                  <string>$PROV_UUID</string>
               </dict>
               <key>signingStyle</key>
               <string>manual</string>
@@ -62,6 +61,7 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
           
+          # Passo 1: Archive (Compilação)
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -76,6 +76,7 @@ workflows:
             LD_DEAD_STRIP=YES \
             AD_HOC_CODE_SIGNING_ALLOWED=YES
           
+          # Passo 2: Export (Geração do IPA para App Store)
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
