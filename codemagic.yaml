@@ -10,8 +10,8 @@ workflows:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
-        # Certifique-se de que o nome abaixo é o exato do portal da Apple
-        PROFILE_NAME: "Pax_Rio_Verde_Producao"
+        # O UUID que você acabou de encontrar
+        PROV_UUID: "e7d29ce1-af82-4384-b842-b13548f9637c"
     scripts:
       - name: Set gradlew permissions
         script: chmod +x gradlew
@@ -21,23 +21,21 @@ workflows:
 
       - name: Install Certificate and Profile
         script: |
-          # 1. Instala o Certificado P12 no Chaveiro do macOS
+          # 1. Instala o Certificado P12
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # 2. Cria a pasta de perfis usando $HOME (evita erro de permissão/caminho)
+          # 2. Cria a pasta de perfis do Xcode
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
           
-          # 3. Decodifica o perfil diretamente para a pasta correta
-          echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/pax_rio_verde.mobileprovision"
-          
-          # 4. Lista para confirmar se o arquivo foi criado com sucesso
-          ls -la "$PROFILES_DIR"
+          # 3. Instala o perfil usando o UUID como nome do arquivo
+          echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
+          echo "Perfil instalado com UUID: $PROV_UUID"
 
       - name: Create Export Options
         script: |
-          # Cria o arquivo de configuração necessário para gerar o IPA da App Store
+          # Gera o arquivo de exportação apontando para o UUID correto
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -50,7 +48,7 @@ workflows:
               <key>provisioningProfiles</key>
               <dict>
                   <key>$APP_ID</key>
-                  <string>$PROFILE_NAME</string>
+                  <string>$PROV_UUID</string>
               </dict>
               <key>signingStyle</key>
               <string>manual</string>
@@ -60,11 +58,10 @@ workflows:
 
       - name: Build iOS App (IPA)
         script: |
-          # 1. Prepara as pastas de destino
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
           
-          # 2. Faz o Archive nativo do Xcode forçando a assinatura manual
+          # Build usando xcodebuild nativo para aceitar a assinatura manual por UUID
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -72,9 +69,8 @@ workflows:
             -archivePath build/ios/xcarchive/app.xcarchive \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME"
+            PROVISIONING_PROFILE="$PROV_UUID"
           
-          # 3. Exporta o Archive transformando-o no arquivo .ipa final
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
@@ -82,7 +78,6 @@ workflows:
 
       - name: Publish to App Store Connect
         script: |
-          # Envia o binário para o TestFlight/App Store Connect
           app-store-connect publish \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
@@ -92,8 +87,3 @@ workflows:
 
     artifacts:
       - build/ios/ipa/*.ipa
-
-    publishing:
-      email:
-        recipients:
-          - paxadmrv@gmail.com
