@@ -10,6 +10,7 @@ workflows:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
+        TEAM_ID: "SEU_TEAM_ID_AQUI" # Adicione seu Team ID da Apple (10 caracteres)
     scripts:
       - name: Set gradlew permissions
         script: chmod +x gradlew
@@ -23,16 +24,39 @@ workflows:
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # 2. Instala o Provisioning Profile manualmente na pasta do Xcode
+          # 2. Instala o Provisioning Profile
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo "$PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/pax_rio_verde.mobileprovision
 
+      - name: Create Export Options
+        script: |
+          # Criamos o arquivo que o Xcode exigiu no erro anterior
+          cat > /Users/builder/export_options.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>teamID</key>
+              <string>$TEAM_ID</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>$APP_ID</key>
+                  <string>pax_rio_verde</string>
+              </dict>
+              <key>signingStyle</key>
+              <string>manual</string>
+          </dict>
+          </plist>
+          EOF
+
       - name: Build iOS App (IPA)
         script: |
-          # O build-ipa agora encontrará tudo pronto no sistema
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME"
+            --scheme "$XCODE_SCHEME" \
+            --export-options-plist "/Users/builder/export_options.plist"
 
       - name: Publish to App Store Connect
         script: |
