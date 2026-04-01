@@ -20,19 +20,13 @@ workflows:
 
       - name: Install Certificate and Profile
         script: |
-          # 1. Instala o Certificado P12
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # 2. Pasta de perfis
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
-          
-          # 3. Instala o perfil com o nome do UUID
           echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
           
-          # Importante: Garantir que o nome da Identity seja Apple Distribution
-          # Se o seu certificado for de outro tipo, trocaremos abaixo.
           echo "export CODE_SIGN_IDENTITY=\"Apple Distribution\"" >> $CM_ENV
 
       - name: Create Export Options
@@ -62,7 +56,6 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
           
-          # Mudança crucial: usamos PROVISIONING_PROFILE e especificamos a IDENTITY
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -81,12 +74,17 @@ workflows:
 
       - name: Publish to App Store Connect
         script: |
+          # Comando corrigido para a nova CLI do Codemagic
           app-store-connect publish \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
-            --app-id "$APP_ID" \
-            --ipa build/ios/ipa/*.ipa
+            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY"
+            # O sistema vai encontrar o IPA automaticamente na pasta build
 
     artifacts:
       - build/ios/ipa/*.ipa
+
+    publishing:
+      email:
+        recipients:
+          - paxadmrv@gmail.com
