@@ -5,7 +5,7 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - "Pax Rio Verde" # O Codemagic vai buscar as chaves aqui
+        - "Pax Rio Verde" # Certifique-se de que este nome está idêntico ao do painel
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
@@ -19,7 +19,6 @@ workflows:
 
       - name: Fetch signing files from Apple
         script: |
-          # Este comando usa as variáveis do seu grupo para baixar os certificados
           app-store-connect fetch-signing-files "$APP_ID" \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
@@ -41,10 +40,10 @@ workflows:
 
     publishing:
       app_store_connect:
-        # Aqui fornecemos as chaves manualmente para não depender da integração do painel
+        # Estes 3 campos são obrigatórios quando não se usa 'auth: integration'
         issuer_id: $APP_STORE_CONNECT_ISSUER_ID
         key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-
+        private_key: $APP_STORE_CONNECT_PRIVATE_KEY
       email:
         recipients:
           - paxadmrv@gmail.com
