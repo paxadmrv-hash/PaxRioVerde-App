@@ -10,7 +10,8 @@ workflows:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
-        TEAM_ID: "SEU_TEAM_ID_AQUI" # Adicione seu Team ID da Apple (10 caracteres)
+        # O nome abaixo deve ser o nome EXATO do perfil no portal da Apple
+        PROFILE_NAME: "Pax_Rio_Verde_Producao"
     scripts:
       - name: Set gradlew permissions
         script: chmod +x gradlew
@@ -20,17 +21,17 @@ workflows:
 
       - name: Install Certificate and Profile
         script: |
-          # 1. Instala o Certificado .p12
+          # 1. Instala o Certificado P12 no Chaveiro
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # 2. Instala o Provisioning Profile
+          # 2. Instala o Provisioning Profile na pasta do Xcode
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "$PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/pax_rio_verde.mobileprovision
+          echo "$PROVISIONING_PROFILE" | base64 --decode > "~/Library/MobileDevice/Provisioning Profiles/pax_rio_verde.mobileprovision"
 
       - name: Create Export Options
         script: |
-          # Criamos o arquivo que o Xcode exigiu no erro anterior
+          # Criamos o arquivo de configuração para a exportação do IPA
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -43,7 +44,7 @@ workflows:
               <key>provisioningProfiles</key>
               <dict>
                   <key>$APP_ID</key>
-                  <string>pax_rio_verde</string>
+                  <string>$PROFILE_NAME</string>
               </dict>
               <key>signingStyle</key>
               <string>manual</string>
@@ -53,13 +54,16 @@ workflows:
 
       - name: Build iOS App (IPA)
         script: |
+          # Forçamos o Xcode a usar o Team ID e o Perfil instalados manualmente
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME" \
-            --export-options-plist "/Users/builder/export_options.plist"
+            --export-options-plist "/Users/builder/export_options.plist" \
+            --args "DEVELOPMENT_TEAM=$TEAM_ID CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER=$PROFILE_NAME"
 
       - name: Publish to App Store Connect
         script: |
+          # Upload final para o TestFlight
           app-store-connect publish \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
