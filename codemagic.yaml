@@ -60,12 +60,25 @@ workflows:
 
       - name: Build iOS App (IPA)
         script: |
-          # Executa o build forçando o uso do Team ID e do Profile instalados acima
-          xcode-project build-ipa \
-            --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME" \
-            --export-options-plist "/Users/builder/export_options.plist" \
-            --args "DEVELOPMENT_TEAM=$TEAM_ID CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER=$PROFILE_NAME"
+          # 1. Prepara as pastas de destino
+          mkdir -p build/ios/xcarchive
+          mkdir -p build/ios/ipa
+          
+          # 2. Faz o Archive nativo do Xcode forçando a assinatura manual
+          xcodebuild clean archive \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -archivePath build/ios/xcarchive/app.xcarchive \
+            CODE_SIGN_STYLE="Manual" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME"
+          
+          # 3. Exporta o Archive transformando-o no arquivo .ipa final
+          xcodebuild -exportArchive \
+            -archivePath build/ios/xcarchive/app.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist "/Users/builder/export_options.plist"
 
       - name: Publish to App Store Connect
         script: |
