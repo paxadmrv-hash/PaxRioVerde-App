@@ -5,7 +5,7 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - "Pax Rio Verde" # Certifique-se de que o nome do grupo está exatamente assim
+        - "Pax Rio Verde" # Certifique-se que o nome do grupo está idêntico ao painel
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
@@ -40,7 +40,7 @@ workflows:
 
     publishing:
       app_store_connect:
-        # Estes 3 campos resolvem o erro de "campos obrigatórios"
+        # Correção da linha 46: A propriedade deve ser 'private_key'
         issuer_id: $APP_STORE_CONNECT_ISSUER_ID
         key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
         private_key: $APP_STORE_CONNECT_PRIVATE_KEY
