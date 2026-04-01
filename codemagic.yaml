@@ -13,21 +13,35 @@ workflows:
     scripts:
       - name: Set gradlew permissions
         script: chmod +x gradlew
+
       - name: Initialize Keychain
         script: keychain initialize
+
       - name: Fetch signing files
         script: |
-          app-store-connect fetch-signing-files "$APP_ID" --type IOS_APP_STORE --create
+          app-store-connect fetch-signing-files "$APP_ID" \
+            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            --type IOS_APP_STORE \
+            --create
+
       - name: Install certificates
         script: keychain add-certificates
-      - name: Build iOS App
+
+      - name: Build and Release IPA
         script: |
-          xcode-project build-ipa --project "$XCODE_PROJECT" --scheme "$XCODE_SCHEME"
+          # O comando 'build-ipa' com as flags de App Store já prepara o envio
+          xcode-project build-ipa \
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+
     artifacts:
       - build/ios/ipa/*.ipa
+
     publishing:
       app_store_connect:
-        auth: integration  # Isso agora vai funcionar porque você ligou a chave no painel
+        auth: integration # Deixe assim para validar o arquivo
       email:
         recipients:
           - paxadmrv@gmail.com
