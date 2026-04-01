@@ -10,8 +10,10 @@ workflows:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
-        PROV_UUID: "e7d29ce1-af82-4384-b842-b13548f9637c"
-        PROV_NAME: "Pax_Rio_Verde_Producao"
+        # O NOVO UUID QUE VOCÊ ENVIOU
+        PROV_UUID: "032e0993-d821-4efc-ba21-4ae65becb850"
+        # O NOME EXATO DO PERFIL NO PORTAL DA APPLE
+        PROV_NAME: "Pax_Rio_Verde_Producao_Novo"
     scripts:
       - name: Set gradlew permissions
         script: chmod +x gradlew
@@ -26,10 +28,10 @@ workflows:
           
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
+          # Instala usando o novo UUID
           echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
           
-          # Tentaremos usar a identidade mais abrangente para casar com o perfil
-          echo "export CODE_SIGN_IDENTITY=\"iPhone Distribution\"" >> $CM_ENV
+          echo "export CODE_SIGN_IDENTITY=\"Apple Distribution\"" >> $CM_ENV
 
       - name: Create Export Options
         script: |
