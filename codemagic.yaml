@@ -29,19 +29,26 @@ workflows:
       - name: Install certificates
         script: keychain add-certificates
 
-      - name: Build and Release IPA
+      - name: Build iOS App
         script: |
-          # O comando 'build-ipa' com as flags de App Store já prepara o envio
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
+
+      - name: Publish to App Store Connect
+        script: |
+          # Este comando faz o upload manual usando suas chaves, ignorando o erro do YAML
+          app-store-connect publish \
+            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            --app-id "$APP_ID" \
+            --ipa build/ios/ipa/*.ipa
 
     artifacts:
       - build/ios/ipa/*.ipa
 
     publishing:
-      app_store_connect:
-        auth: integration # Deixe assim para validar o arquivo
       email:
         recipients:
           - paxadmrv@gmail.com
