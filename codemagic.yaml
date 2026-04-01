@@ -10,7 +10,7 @@ workflows:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
-        # O UUID que você acabou de encontrar
+        # UUID validado por você anteriormente
         PROV_UUID: "e7d29ce1-af82-4384-b842-b13548f9637c"
     scripts:
       - name: Set gradlew permissions
@@ -21,21 +21,21 @@ workflows:
 
       - name: Install Certificate and Profile
         script: |
-          # 1. Instala o Certificado P12
+          # 1. Instala o Certificado P12 no Chaveiro
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # 2. Cria a pasta de perfis do Xcode
+          # 2. Prepara a pasta oficial de perfis do macOS
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
           
-          # 3. Instala o perfil usando o UUID como nome do arquivo
+          # 3. Instala o perfil usando o UUID como nome do arquivo (padrão Apple)
           echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
-          echo "Perfil instalado com UUID: $PROV_UUID"
+          echo "Perfil Pax Rio Verde instalado com UUID: $PROV_UUID"
 
       - name: Create Export Options
         script: |
-          # Gera o arquivo de exportação apontando para o UUID correto
+          # Gera o arquivo plist necessário para a exportação do IPA final
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -61,7 +61,7 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
           
-          # Build usando xcodebuild nativo para aceitar a assinatura manual por UUID
+          # Executa o Archive forçando os parâmetros de assinatura manual
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -69,8 +69,10 @@ workflows:
             -archivePath build/ios/xcarchive/app.xcarchive \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            PROVISIONING_PROFILE="$PROV_UUID"
+            PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
           
+          # Exporta o Archive gerando o arquivo .ipa para a App Store
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
@@ -78,6 +80,7 @@ workflows:
 
       - name: Publish to App Store Connect
         script: |
+          # Upload automático para o App Store Connect / TestFlight
           app-store-connect publish \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
@@ -87,3 +90,8 @@ workflows:
 
     artifacts:
       - build/ios/ipa/*.ipa
+
+    publishing:
+      email:
+        recipients:
+          - paxadmrv@gmail.com
