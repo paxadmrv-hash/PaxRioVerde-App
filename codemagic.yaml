@@ -17,8 +17,15 @@ workflows:
       - name: Initialize Keychain
         script: keychain initialize
 
-      - name: Fetch signing files
+      - name: Install Certificates
         script: |
+          # Importante: Instala o certificado físico para que a assinatura funcione
+          echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
+          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
+
+      - name: Fetch signing files from Apple
+        script: |
+          # Baixa os perfis de provisionamento (Provisioning Profiles)
           app-store-connect fetch-signing-files "$APP_ID" \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
@@ -26,18 +33,19 @@ workflows:
             --type IOS_APP_STORE \
             --create
 
-      - name: Install certificates
+      - name: Refresh Keychain certificates
         script: keychain add-certificates
 
-      - name: Build iOS App
+      - name: Build iOS App (IPA)
         script: |
+          # Compila o app e gera o arquivo para a loja
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
 
       - name: Publish to App Store Connect
         script: |
-          # Este comando faz o upload manual usando suas chaves, ignorando o erro do YAML
+          # Realiza o upload manual via script (ignora erros de integração do painel)
           app-store-connect publish \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
