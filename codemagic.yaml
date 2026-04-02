@@ -1,17 +1,16 @@
 workflows:
   ios-workflow:
-    name: Pax Rio Verde iOS Build Final
+    name: Pax Rio Verde iOS Final Build
     instance_type: mac_mini_m2
     environment:
       groups:
-        - "Pax Rio Verde"
+        - "Pax Rio Verde" # Certifique-se de que este grupo existe no Codemagic
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
         TEAM_ID: "264TWUW2L6"
         PROV_NAME: "Pax_Rio_Verde_Final"
-        # UUID Atualizado!
         PROV_UUID: "f83a914d-202a-436e-9e51-257ae86fccd0"
     scripts:
       - name: Initialize Keychain
@@ -19,20 +18,25 @@ workflows:
 
       - name: Install Credentials
         script: |
-          # Instala o novo P12
+          # 1. Instala o Certificado P12
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # Instala o novo Perfil usando o UUID como nome do arquivo
+          # 2. Instala o Perfil de Provisionamento (Cria as duas versões para garantir)
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
+          
+          # Instalação pelo UUID (Padrão do Sistema)
           echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
           
-          echo "export CODE_SIGN_IDENTITY=\"Apple Distribution\"" >> $CM_ENV
+          # Instalação pelo Nome (O que o Xcode busca no erro 65)
+          echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/$PROV_NAME.mobileprovision"
+          
+          echo "Certificado e Perfil instalados com sucesso."
+          ls -la "$PROFILES_DIR"
 
-      - name: Build and Sign IPA
+      - name: Create Export Options Plist
         script: |
-          # Gera o arquivo de opções de exportação
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -55,7 +59,12 @@ workflows:
           </plist>
           EOF
 
-          # Executa o Archive e Export
+      - name: Build and Sign IPA
+        script: |
+          mkdir -p build/ios/xcarchive
+          mkdir -p build/ios/ipa
+          
+          # O segredo aqui é usar o PROVISIONING_PROFILE=$PROV_UUID para forçar o match
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -64,7 +73,7 @@ workflows:
             PRODUCT_BUNDLE_IDENTIFIER="$APP_ID" \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROV_NAME" \
+            PROVISIONING_PROFILE="$PROV_UUID" \
             CODE_SIGN_IDENTITY="Apple Distribution"
 
           xcodebuild -exportArchive \
