@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: Pax Rio Verde iOS Final Build
+    name: Pax Rio Verde iOS Final
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
@@ -12,7 +12,7 @@ workflows:
         APP_ID: "br.com.paxrioverde.app"
         TEAM_ID: "264TWUW2L6"
         PROV_NAME: "Pax_Rio_Verde_Final"
-        # UUID que você extraiu do arquivo novo
+        # O UUID que você me passou
         PROV_UUID: "f83a914d-202a-436e-9e51-257ae86fccd0"
     scripts:
       - name: Initialize Keychain
@@ -24,16 +24,16 @@ workflows:
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # 2. Instala o Perfil de Provisionamento (Cria com o nome do UUID)
+          # 2. Instala o Perfil de Provisionamento (Com UUID e Nome para não ter erro)
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
-          echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
+          echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
+          cp "$PROFILES_DIR/$PROV_UUID.mobileprovision" "$PROFILES_DIR/$PROV_NAME.mobileprovision"
           
-          # 3. Força o Xcode a aceitar o perfil (Bruta força)
-          sed -i '' "s/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g" "$XCODE_PROJECT/project.pbxproj"
-          sed -i '' "s/PROVISIONING_PROFILE = \".*\";/PROVISIONING_PROFILE = \"$PROV_UUID\";/g" "$XCODE_PROJECT/project.pbxproj"
+          # Garante permissão de leitura para o Xcode
+          chmod 644 "$PROFILES_DIR/$PROV_UUID.mobileprovision"
           
-          echo "Certificado e Perfil ($PROV_UUID) instalados."
+          echo "Credenciais instaladas com sucesso."
 
       - name: Create Export Options
         script: |
@@ -61,7 +61,10 @@ workflows:
 
       - name: Build and Sign IPA
         script: |
-          # Limpa e executa o Archive forçando os parâmetros de assinatura
+          mkdir -p build/ios/xcarchive
+          mkdir -p build/ios/ipa
+
+          # Archive forçando o uso do UUID específico
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -73,10 +76,9 @@ workflows:
             CODE_SIGN_STYLE="Manual" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            ALLOW_PROVISIONING_DEVICE_REGISTRATION=NO
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-          # Exporta o IPA final
+          # Exportação do arquivo final
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
