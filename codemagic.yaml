@@ -1,4 +1,3 @@
-# codemagic.yaml completo para Pax Rio Verde
 workflows:
   ios-workflow:
     name: Pax Rio Verde iOS App Store
@@ -6,16 +5,14 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - "Pax Rio Verde" # Certifique-se que este grupo existe no painel do Codemagic
+        - "Pax Rio Verde"
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
-        # UUID atualizado conforme sua verificação
         PROV_UUID: "032e0993-d821-4efc-ba21-4ae65becb850"
-        # Nome exato que deve estar no Portal da Apple
         PROV_NAME: "Pax_Rio_Verde_Producao_Novo"
-        TEAM_ID: "264TWUW2L6" # Confirmado pela sua imagem de assinatura
+        TEAM_ID: "264TWUW2L6"
     scripts:
       - name: Set gradlew permissions
         script: chmod +x gradlew
@@ -25,19 +22,22 @@ workflows:
 
       - name: Install Certificate and Profile
         script: |
-          # Decodifica e instala o certificado P12
+          # 1. Instala o Certificado
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # Organiza o diretório de Provisioning Profiles
+          # 2. Instala o Perfil de Provisionamento
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
           
-          # Instala o perfil usando o UUID como nome de arquivo (padrão Xcode)
+          # Decodifica o perfil para o caminho que o Xcode espera (UUID.mobileprovision)
           echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
           
-          # Backup: Copia também com o nome amigável para garantir o vínculo
+          # FORÇA BRUTA: Copia o perfil com o nome que o Xcode está pedindo no erro
           cp "$PROFILES_DIR/$PROV_UUID.mobileprovision" "$PROFILES_DIR/$PROV_NAME.mobileprovision"
+          
+          # Verifica se o arquivo foi criado corretamente para o log
+          ls -la "$PROFILES_DIR"
           
           echo "export CODE_SIGN_IDENTITY=\"Apple Distribution\"" >> $CM_ENV
 
@@ -72,7 +72,6 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
           
-          # ARCHIVE: Comando otimizado para evitar erro 65
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -83,22 +82,12 @@ workflows:
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_NAME" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-          # EXPORT: Gera o arquivo .ipa final
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
             -exportOptionsPlist "/Users/builder/export_options.plist"
-
-      - name: Publish to App Store Connect
-        script: |
-          # Publicação automática
-          app-store-connect publish \
-            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
-            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY"
 
     artifacts:
       - build/ios/ipa/*.ipa
