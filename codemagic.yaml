@@ -9,9 +9,12 @@ workflows:
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
-        # 1. CONFIRME SE ESTÁ ASSIM NO CODEMAGIC:
+        # 1. BUNDLE ID DO APP (IDENTIFICADOR)
         APP_ID: "br.com.paxrioverde.app"
+        # 2. O UUID QUE VOCÊ EXTRAIU
         PROV_UUID: "032e0993-d821-4efc-ba21-4ae65becb850"
+        # 3. O NOME EXATO QUE VOCÊ DEU AO PERFIL NO PORTAL (CONFORME SUA IMAGEM)
+        PROV_NAME: "Pax_Rio_Verde_Producao_Novo"
     scripts:
       - name: Set gradlew permissions
         script: chmod +x gradlew
@@ -21,11 +24,9 @@ workflows:
 
       - name: Install Certificate and Profile
         script: |
-          # Instala Certificado
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # Instala Perfil de Provisionamento no local que o Xcode exige
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
           echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
@@ -34,7 +35,7 @@ workflows:
 
       - name: Create Export Options
         script: |
-          # Criando o arquivo que guia a exportação do IPA
+          # Criando o arquivo de exportação usando o NOME do perfil
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -47,7 +48,7 @@ workflows:
               <key>provisioningProfiles</key>
               <dict>
                   <key>br.com.paxrioverde.app</key>
-                  <string>032e0993-d821-4efc-ba21-4ae65becb850</string>
+                  <string>Pax_Rio_Verde_Producao_Novo</string>
               </dict>
               <key>signingStyle</key>
               <string>manual</string>
@@ -62,21 +63,22 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
           
-          # Gera o Archive (Sucesso já confirmado antes)
+          # Archive - Usa o UUID (Já sabemos que funciona!)
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -archivePath build/ios/xcarchive/app.xcarchive \
-            PRODUCT_BUNDLE_IDENTIFIER="$APP_ID" \
+            PRODUCT_BUNDLE_IDENTIFIER="br.com.paxrioverde.app" \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE="$PROV_UUID" \
-            CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            LD_DEAD_STRIP=YES
-          
-          # Exporta o IPA (Onde dava o erro 70)
+            LD_DEAD_STRIP=YES \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+          # Export - Usa o arquivo de opções (Onde vamos vencer o erro 70)
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
