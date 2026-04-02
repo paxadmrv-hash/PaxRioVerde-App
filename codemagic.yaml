@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: Pax Rio Verde iOS Final
+    name: Pax Rio Verde iOS Final Build
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
@@ -28,13 +28,13 @@ workflows:
           mkdir -p "$PROFILES_DIR"
           echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
           
-          # 3. CORREÇÃO CRÍTICA: Força o projeto a aceitar "Apple Distribution" e Assinatura Manual
-          # Isso remove as referências antigas a "iOS Distribution" que estão causando o erro
+          # 3. LIMPEZA BRUTA: Troca os nomes de assinatura dentro do arquivo do projeto Xcode
+          # Isso mata o erro de "iOS Distribution" vs "Apple Distribution"
           sed -i '' "s/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g" "$XCODE_PROJECT/project.pbxproj"
           sed -i '' "s/iOS Distribution/Apple Distribution/g" "$XCODE_PROJECT/project.pbxproj"
           sed -i '' "s/PROVISIONING_PROFILE = \".*\";/PROVISIONING_PROFILE = \"$PROV_UUID\";/g" "$XCODE_PROJECT/project.pbxproj"
           
-          echo "Projeto configurado para Apple Distribution e Perfil $PROV_UUID."
+          echo "Projeto atualizado para Apple Distribution com o UUID $PROV_UUID."
 
       - name: Create Export Options
         script: |
@@ -65,7 +65,7 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          # Executa o Archive forçando os parâmetros de identidade modernos
+          # O comando archive agora usa explicitamente a identidade correta e o UUID do perfil
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -79,7 +79,7 @@ workflows:
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-          # Exportação para gerar o .ipa
+          # Exporta o IPA final da Pax Rio Verde
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
