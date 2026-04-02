@@ -9,10 +9,12 @@ workflows:
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
-        # DADOS FIXOS PARA EVITAR ERRO 65
         APP_ID: "br.com.paxrioverde.app"
+        # 1. ATUALIZE O UUID SE ELE MUDAR NO NOVO PERFIL
         PROV_UUID: "032e0993-d821-4efc-ba21-4ae65becb850"
+        # 2. O NOME QUE VOCÊ VAI SALVAR NO PORTAL AGORA
         PROV_NAME: "Pax_Rio_Verde_Producao_Novo"
+        TEAM_ID: "264TWUW2L6"
     scripts:
       - name: Set gradlew permissions
         script: chmod +x gradlew
@@ -27,7 +29,6 @@ workflows:
           
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
-          # Instalamos o arquivo com o nome do UUID para o Xcode localizar
           echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
           
           echo "export CODE_SIGN_IDENTITY=\"Apple Distribution\"" >> $CM_ENV
@@ -45,8 +46,8 @@ workflows:
               <string>$TEAM_ID</string>
               <key>provisioningProfiles</key>
               <dict>
-                  <key>br.com.paxrioverde.app</key>
-                  <string>Pax_Rio_Verde_Producao_Novo</string>
+                  <key>$APP_ID</key>
+                  <string>$PROV_NAME</string>
               </dict>
               <key>signingStyle</key>
               <string>manual</string>
@@ -61,7 +62,6 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
           
-          # ARCHIVE: Usando UUID e Nome para garantir que o erro 65 suma
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -70,14 +70,12 @@ workflows:
             PRODUCT_BUNDLE_IDENTIFIER="$APP_ID" \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            PROVISIONING_PROFILE="$PROV_UUID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_NAME" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             COMPILER_INDEX_STORE_ENABLE=NO \
             LD_DEAD_STRIP=YES
 
-          # EXPORT: Gerando o arquivo final
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
