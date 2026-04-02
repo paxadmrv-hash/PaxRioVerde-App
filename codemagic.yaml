@@ -1,8 +1,7 @@
 workflows:
   ios-workflow:
-    name: Pax Rio Verde iOS App Store
+    name: Pax Rio Verde iOS Build Final
     instance_type: mac_mini_m2
-    max_build_duration: 60
     environment:
       groups:
         - "Pax Rio Verde"
@@ -10,39 +9,30 @@ workflows:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
-        PROV_UUID: "032e0993-d821-4efc-ba21-4ae65becb850"
-        PROV_NAME: "Pax_Rio_Verde_Producao_Novo"
         TEAM_ID: "264TWUW2L6"
+        PROV_NAME: "Pax_Rio_Verde_Final"
+        # UUID Atualizado!
+        PROV_UUID: "f83a914d-202a-436e-9e51-257ae86fccd0"
     scripts:
-      - name: Set gradlew permissions
-        script: chmod +x gradlew
-
       - name: Initialize Keychain
         script: keychain initialize
 
-      - name: Install Certificate and Profile
+      - name: Install Credentials
         script: |
-          # 1. Instala o Certificado
+          # Instala o novo P12
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # 2. Instala o Perfil de Provisionamento
+          # Instala o novo Perfil usando o UUID como nome do arquivo
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
-          
-          # Decodifica o perfil para o caminho que o Xcode espera (UUID.mobileprovision)
           echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
-          
-          # FORÇA BRUTA: Copia o perfil com o nome que o Xcode está pedindo no erro
-          cp "$PROFILES_DIR/$PROV_UUID.mobileprovision" "$PROFILES_DIR/$PROV_NAME.mobileprovision"
-          
-          # Verifica se o arquivo foi criado corretamente para o log
-          ls -la "$PROFILES_DIR"
           
           echo "export CODE_SIGN_IDENTITY=\"Apple Distribution\"" >> $CM_ENV
 
-      - name: Create Export Options Plist
+      - name: Build and Sign IPA
         script: |
+          # Gera o arquivo de opções de exportação
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -61,17 +51,11 @@ workflows:
               <string>manual</string>
               <key>manageAppVersionAndBuildNumber</key>
               <true/>
-              <key>compileBitcode</key>
-              <false/>
           </dict>
           </plist>
           EOF
 
-      - name: Build iOS App (Archive & Export)
-        script: |
-          mkdir -p build/ios/xcarchive
-          mkdir -p build/ios/ipa
-          
+          # Executa o Archive e Export
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -81,8 +65,7 @@ workflows:
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_NAME" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES
+            CODE_SIGN_IDENTITY="Apple Distribution"
 
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
