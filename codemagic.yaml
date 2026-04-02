@@ -9,8 +9,8 @@ workflows:
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
+        # 1. CONFIRME SE ESTÁ ASSIM NO CODEMAGIC:
         APP_ID: "br.com.paxrioverde.app"
-        # O NOVO UUID QUE VOCÊ EXTRAIU DO PERFIL
         PROV_UUID: "032e0993-d821-4efc-ba21-4ae65becb850"
     scripts:
       - name: Set gradlew permissions
@@ -21,19 +21,20 @@ workflows:
 
       - name: Install Certificate and Profile
         script: |
+          # Instala Certificado
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
+          # Instala Perfil de Provisionamento no local que o Xcode exige
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
-          # Instalando o perfil físico com o UUID como nome de arquivo
           echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
           
           echo "export CODE_SIGN_IDENTITY=\"Apple Distribution\"" >> $CM_ENV
 
       - name: Create Export Options
         script: |
-          # Usamos o UUID diretamente no dicionário de perfis para evitar erro de busca por nome
+          # Criando o arquivo que guia a exportação do IPA
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -45,8 +46,8 @@ workflows:
               <string>$TEAM_ID</string>
               <key>provisioningProfiles</key>
               <dict>
-                  <key>$APP_ID</key>
-                  <string>$PROV_UUID</string>
+                  <key>br.com.paxrioverde.app</key>
+                  <string>032e0993-d821-4efc-ba21-4ae65becb850</string>
               </dict>
               <key>signingStyle</key>
               <string>manual</string>
@@ -61,7 +62,7 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
           
-          # Passo 1: Archive (Compilação)
+          # Gera o Archive (Sucesso já confirmado antes)
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -73,10 +74,9 @@ workflows:
             PROVISIONING_PROFILE="$PROV_UUID" \
             CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY" \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            LD_DEAD_STRIP=YES \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES
+            LD_DEAD_STRIP=YES
           
-          # Passo 2: Export (Geração do IPA para App Store)
+          # Exporta o IPA (Onde dava o erro 70)
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
