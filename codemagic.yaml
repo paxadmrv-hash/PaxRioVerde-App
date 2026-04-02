@@ -1,3 +1,4 @@
+# codemagic.yaml completo para Pax Rio Verde
 workflows:
   ios-workflow:
     name: Pax Rio Verde iOS App Store
@@ -5,16 +6,16 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - "Pax Rio Verde"
+        - "Pax Rio Verde" # Certifique-se que este grupo existe no painel do Codemagic
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
-        # 1. ATUALIZE O UUID SE ELE MUDAR NO NOVO PERFIL
+        # UUID atualizado conforme sua verificação
         PROV_UUID: "032e0993-d821-4efc-ba21-4ae65becb850"
-        # 2. O NOME QUE VOCÊ VAI SALVAR NO PORTAL AGORA
+        # Nome exato que deve estar no Portal da Apple
         PROV_NAME: "Pax_Rio_Verde_Producao_Novo"
-        TEAM_ID: "264TWUW2L6"
+        TEAM_ID: "264TWUW2L6" # Confirmado pela sua imagem de assinatura
     scripts:
       - name: Set gradlew permissions
         script: chmod +x gradlew
@@ -24,16 +25,23 @@ workflows:
 
       - name: Install Certificate and Profile
         script: |
+          # Decodifica e instala o certificado P12
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
+          # Organiza o diretório de Provisioning Profiles
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
+          
+          # Instala o perfil usando o UUID como nome de arquivo (padrão Xcode)
           echo "$PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
+          
+          # Backup: Copia também com o nome amigável para garantir o vínculo
+          cp "$PROFILES_DIR/$PROV_UUID.mobileprovision" "$PROFILES_DIR/$PROV_NAME.mobileprovision"
           
           echo "export CODE_SIGN_IDENTITY=\"Apple Distribution\"" >> $CM_ENV
 
-      - name: Create Export Options
+      - name: Create Export Options Plist
         script: |
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
@@ -51,17 +59,20 @@ workflows:
               </dict>
               <key>signingStyle</key>
               <string>manual</string>
+              <key>manageAppVersionAndBuildNumber</key>
+              <true/>
               <key>compileBitcode</key>
               <false/>
           </dict>
           </plist>
           EOF
 
-      - name: Build iOS App (IPA)
+      - name: Build iOS App (Archive & Export)
         script: |
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
           
+          # ARCHIVE: Comando otimizado para evitar erro 65
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -73,9 +84,9 @@ workflows:
             PROVISIONING_PROFILE_SPECIFIER="$PROV_NAME" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            LD_DEAD_STRIP=YES
+            COMPILER_INDEX_STORE_ENABLE=NO
 
+          # EXPORT: Gera o arquivo .ipa final
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
@@ -83,6 +94,7 @@ workflows:
 
       - name: Publish to App Store Connect
         script: |
+          # Publicação automática
           app-store-connect publish \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
