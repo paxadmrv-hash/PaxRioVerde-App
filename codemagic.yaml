@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: Pax Rio Verde iOS Final Build
+    name: Pax Rio Verde iOS Final
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
@@ -28,10 +28,13 @@ workflows:
           mkdir -p "$PROFILES_DIR"
           echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
           
-          # 3. Força a assinatura manual no projeto
+          # 3. CORREÇÃO CRÍTICA: Força o projeto a aceitar "Apple Distribution" e Assinatura Manual
+          # Isso remove as referências antigas a "iOS Distribution" que estão causando o erro
           sed -i '' "s/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g" "$XCODE_PROJECT/project.pbxproj"
+          sed -i '' "s/iOS Distribution/Apple Distribution/g" "$XCODE_PROJECT/project.pbxproj"
+          sed -i '' "s/PROVISIONING_PROFILE = \".*\";/PROVISIONING_PROFILE = \"$PROV_UUID\";/g" "$XCODE_PROJECT/project.pbxproj"
           
-          echo "Credenciais prontas para o build."
+          echo "Projeto configurado para Apple Distribution e Perfil $PROV_UUID."
 
       - name: Create Export Options
         script: |
@@ -62,7 +65,7 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          # O comando archive agora busca o certificado automaticamente no chaveiro inicializado
+          # Executa o Archive forçando os parâmetros de identidade modernos
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -76,7 +79,7 @@ workflows:
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-          # Exporta o IPA final
+          # Exportação para gerar o .ipa
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
