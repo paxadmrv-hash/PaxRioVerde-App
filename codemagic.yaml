@@ -28,18 +28,13 @@ workflows:
           mkdir -p "$PROFILES_DIR"
           echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
           
-          # 3. LIMPEZA BRUTA: Troca os nomes de assinatura dentro do arquivo do projeto Xcode
-          # Corrige o erro crítico: No signing certificate "iOS Distribution" found
-          # Substitui globalmente qualquer menção a "iOS Distribution" ou "iPhone Distribution" por "Apple Distribution"
+          # 3. SANEAMENTO FINAL: Força a assinatura manual e o Apple Distribution em todos os lugares
+          # Se o Xcode teimar com "iOS Distribution", nós forçamos o nome correto no arquivo do projeto
           find . -name "project.pbxproj" -exec sed -i '' "s/iOS Distribution/Apple Distribution/g" {} +
           find . -name "project.pbxproj" -exec sed -i '' "s/iPhone Distribution/Apple Distribution/g" {} +
           find . -name "project.pbxproj" -exec sed -i '' "s/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g" {} +
           
-          # Garante que o Bundle ID e o Team ID sejam os corretos no arquivo do projeto
-          sed -i '' "s/PRODUCT_BUNDLE_IDENTIFIER = .*;/PRODUCT_BUNDLE_IDENTIFIER = $APP_ID;/g" "$XCODE_PROJECT/project.pbxproj"
-          sed -i '' "s/DEVELOPMENT_TEAM = .*;/DEVELOPMENT_TEAM = $TEAM_ID;/g" "$XCODE_PROJECT/project.pbxproj"
-          
-          echo "Projeto Xcode saneado para Apple Distribution e Bundle ID $APP_ID."
+          echo "Projeto Xcode preparado com Apple Distribution e assinatura manual."
 
       - name: Create Export Options
         script: |
