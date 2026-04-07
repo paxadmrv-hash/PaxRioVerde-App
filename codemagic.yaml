@@ -65,11 +65,14 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          # SANEAMENTO DE ÚLTIMA HORA: Corrige o erro "No signing certificate iOS Distribution found"
-          # Substitui qualquer menção a nomes antigos de certificados pelo padrão atual
-          sed -i '' 's/iOS Distribution/Apple Distribution/g' "$XCODE_PROJECT/project.pbxproj"
-          sed -i '' 's/iPhone Distribution/Apple Distribution/g' "$XCODE_PROJECT/project.pbxproj"
-          sed -i '' 's/ProvisioningStyle = Automatic/ProvisioningStyle = Manual/g' "$XCODE_PROJECT/project.pbxproj"
+          # SANEAMENTO AGRESSIVO: Remove qualquer rastro de "iOS Distribution" ou "iPhone Distribution"
+          # Isso corrige o erro onde o Xcode ignora o override do terminal
+          find iosApp -type f -exec sed -i '' "s/iOS Distribution/Apple Distribution/g" {} +
+          find iosApp -type f -exec sed -i '' "s/iPhone Distribution/Apple Distribution/g" {} +
+          
+          # Força o Estilo de Assinatura Manual e o Team ID no arquivo do projeto
+          sed -i '' "s/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g" "$XCODE_PROJECT/project.pbxproj"
+          sed -i '' "s/DEVELOPMENT_TEAM = .*;/DEVELOPMENT_TEAM = $TEAM_ID;/g" "$XCODE_PROJECT/project.pbxproj"
 
           # O comando archive agora usa explicitamente a identidade correta e o UUID do perfil
           xcodebuild clean archive \
