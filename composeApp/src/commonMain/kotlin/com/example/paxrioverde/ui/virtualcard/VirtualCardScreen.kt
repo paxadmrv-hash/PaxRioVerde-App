@@ -3,7 +3,6 @@ package com.example.paxrioverde.ui.virtualcard
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,7 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
@@ -49,7 +47,19 @@ val ExpiredRed = Color(0xFFFF5252)
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun VirtualCardScreen(onBack: () -> Unit, idcliente: Int = 0) {
+fun VirtualCardScreen(
+    onBack: () -> Unit,
+    idcliente: Int = 0,
+    idcontrato: Int = 0,
+    idconvenio: Int = 0,
+    idmensalidade: Int = 0,
+    idcaixa: Int = 0,
+    idfilial: Int = 0,
+    dtvencimento: String = "",
+    valorCartao: String? = "5,00",
+    onCardGenerated: () -> Unit = {},
+    onNavigateToFinance: () -> Unit = {}
+) {
     val cartoesList = WalletCache.cartoesList
     val isPreloading = WalletCache.isPreloading
     
@@ -180,7 +190,19 @@ fun VirtualCardScreen(onBack: () -> Unit, idcliente: Int = 0) {
     }
 
     if (showGerarDialog) {
-        GerarCartaoDialog(onDismiss = { showGerarDialog = false }, idcliente = idcliente)
+        GerarCartaoDialog(
+            onDismiss = { showGerarDialog = false },
+            idcliente = idcliente,
+            idcontrato = idcontrato,
+            idconvenio = idconvenio,
+            idmensalidade = idmensalidade,
+            idcaixa = idcaixa,
+            idfilial = idfilial,
+            dtvencimento = dtvencimento,
+            valorCartao = valorCartao,
+            onSuccess = onCardGenerated,
+            onNavigateToFinance = onNavigateToFinance
+        )
     }
 
     if (expandedCard != null) {
@@ -207,11 +229,11 @@ fun CardContent(item: CartaoItem) {
         else -> Res.drawable.card_titular
     }
 
-    // Valores dinâmicos para evitar sobreposição no Kids e melhorar legibilidade
-    val paddingHoriz = if (isKids) 28.dp else 22.dp
-    val paddingVert = if (isKids) 22.dp else 18.dp
-    val nomeSize = if (isKids) 12.sp else 14.sp
-    val infoSize = if (isKids) 10.sp else 12.sp
+    // Valores otimizados para descer as informações e liberar o fundo
+    val paddingHoriz = if (isKids) 32.dp else 26.dp
+    val paddingVert = if (isKids) 12.dp else 10.dp
+    val nomeSize = if (isKids) 11.sp else 13.sp
+    val infoSize = if (isKids) 9.sp else 11.sp
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
@@ -224,7 +246,7 @@ fun CardContent(item: CartaoItem) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = paddingHoriz, vertical = paddingVert),
+                .padding(start = paddingHoriz, end = paddingHoriz, bottom = paddingVert),
             verticalArrangement = Arrangement.Bottom
         ) {
             // Linha 1: Nome e Parentesco
@@ -235,23 +257,25 @@ fun CardContent(item: CartaoItem) {
             ) {
                 Text(
                     text = (if (item.dep == "S") item.nomeDependente ?: "" else item.nomeCliente).uppercase(),
-                    color = Color.Black,
+                    color = Color.Black.copy(alpha = 0.85f),
                     fontSize = nomeSize,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 0.8.sp,
-                    modifier = Modifier.weight(1f)
+                    letterSpacing = 0.5.sp,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
                 Text(
                     text = parentesco ?: "",
-                    color = Color.Black,
+                    color = Color.Black.copy(alpha = 0.7f),
                     fontSize = infoSize,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold
                 )
             }
 
-            Spacer(modifier = Modifier.height(if (isKids) 2.dp else 4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
             // Linha 2: Contrato e Validade
             Row(
@@ -260,20 +284,20 @@ fun CardContent(item: CartaoItem) {
                 verticalAlignment = Alignment.Bottom
             ) {
                 Text(
-                    text = "Contrato: ${item.idContrato ?: ""}",
-                    color = Color.Black,
+                    text = "CONTRATO: ${item.idContrato ?: ""}",
+                    color = Color.Black.copy(alpha = 0.7f),
                     fontSize = infoSize,
                     fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 0.5.sp
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.3.sp
                 )
                 Text(
                     text = item.dtValidade,
                     color = Color.Black,
-                    fontSize = if (isKids) 12.sp else 14.sp,
+                    fontSize = if (isKids) 11.sp else 13.sp,
                     fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 0.8.sp
                 )
             }
         }
@@ -348,12 +372,29 @@ fun CardExpansionDialog(item: CartaoItem, onDismiss: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GerarCartaoDialog(onDismiss: () -> Unit, idcliente: Int) {
+fun GerarCartaoDialog(
+    onDismiss: () -> Unit,
+    idcliente: Int,
+    idcontrato: Int,
+    idconvenio: Int,
+    idmensalidade: Int,
+    idcaixa: Int,
+    idfilial: Int,
+    dtvencimento: String,
+    valorCartao: String? = "5,00",
+    onSuccess: () -> Unit = {},
+    onNavigateToFinance: () -> Unit = {}
+) {
     var isTitular by remember { mutableStateOf(true) }
     val dependentesList = WalletCache.dependentesList
     var selectedDependente by remember { mutableStateOf<DependenteItem?>(null) }
     var expanded by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    val valorFormatado = remember(valorCartao) {
+        val valor = if (valorCartao.isNullOrEmpty() || valorCartao == "0,00" || valorCartao == "0.00") "5,00" else valorCartao
+        if (valor.contains("R$")) valor else "R$ $valor"
+    }
     
     var showConfirmacao by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
@@ -370,10 +411,26 @@ fun GerarCartaoDialog(onDismiss: () -> Unit, idcliente: Int) {
             title = { Text(if (isSuccess) "Sucesso" else "Atenção", fontWeight = FontWeight.Bold) },
             text = { Text(resultMessage) },
             confirmButton = {
-                Button(onClick = { 
-                    showResultDialog = false
-                    if (isSuccess) onDismiss()
-                }) { Text("OK") }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    if (isSuccess) {
+                        TextButton(onClick = {
+                            showResultDialog = false
+                            onDismiss()
+                            onNavigateToFinance()
+                        }) {
+                            Text("VER FINANCEIRO", color = BrandLightGreen, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Button(onClick = {
+                        showResultDialog = false
+                        if (isSuccess) onDismiss()
+                    }, colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen)) {
+                        Text("OK")
+                    }
+                }
             }
         )
     }
@@ -381,8 +438,16 @@ fun GerarCartaoDialog(onDismiss: () -> Unit, idcliente: Int) {
     if (showConfirmacao) {
         AlertDialog(
             onDismissRequest = { if (!isLoading) showConfirmacao = false },
-            title = { Text("Confirmação", fontWeight = FontWeight.Bold) },
-            text = { Text("Deseja gerar um novo cartão?") },
+            title = { 
+                Text(
+                    "Confirmação", 
+                    fontWeight = FontWeight.Bold,
+                    color = BrandLightGreen
+                ) 
+            },
+            text = { 
+                Text("Atenção: a geração deste cartão gerará um custo adicional de $valorFormatado, que será incluído na sua próxima mensalidade. Deseja gerar o cartão?") 
+            },
             confirmButton = {
                 Button(
                     onClick = {
@@ -391,16 +456,47 @@ fun GerarCartaoDialog(onDismiss: () -> Unit, idcliente: Int) {
                             try {
                                 val tipo = if (isTitular) "titular" else "dependente"
                                 val nomeDep = if (isTitular) "" else selectedDependente?.nomeDependente ?: ""
-                                val response = ApiService.gerarCartao(idcliente, tipo, nomeDep)
                                 
-                                isSuccess = response.success
-                                resultMessage = response.message
-                                if (isSuccess) WalletCache.preLoad(idcliente, forceRefresh = true)
+                                // Limpa o valor para enviar apenas números e ponto
+                                val valorLimpo = if (valorCartao.isNullOrEmpty() || valorCartao == "0,00" || valorCartao == "0.00") "5.00" else {
+                                    valorCartao.replace("R$", "")
+                                        .replace(".", "")
+                                        .replace(",", ".")
+                                        .trim()
+                                }
+
+                                // Envio dos dados para geração do cartão e acionamento do financeiro
+                                val response = ApiService.gerarCartao(
+                                    idcliente = idcliente,
+                                    tipo = tipo,
+                                    nomeDependente = nomeDep,
+                                    idcontrato = idcontrato,
+                                    idconvenio = idconvenio,
+                                    valor = valorLimpo,
+                                    idmensalidade = idmensalidade,
+                                    idcaixa = idcaixa,
+                                    idfilial = idfilial,
+                                    dtvencimento = dtvencimento
+                                )
+                                
+                                if (response.success) {
+                                    isSuccess = true
+                                    resultMessage = "Cartão gerado com sucesso! A cobrança de $valorFormatado foi lançada em seu financeiro."
+                                    
+                                    // Recarrega cartões e notifica o App para atualizar dados do usuário
+                                    WalletCache.clear() // Limpa o cache para garantir que venha do servidor
+                                    WalletCache.preLoad(idcliente, forceRefresh = true)
+                                    onSuccess() 
+                                } else {
+                                    isSuccess = false
+                                    resultMessage = response.message ?: "Erro ao processar solicitação no sistema."
+                                }
+
                                 showConfirmacao = false
                                 showResultDialog = true
                             } catch (e: Exception) {
                                 isSuccess = false
-                                resultMessage = "Erro de conexão."
+                                resultMessage = "Erro de conexão: Verifique sua internet."
                                 showConfirmacao = false
                                 showResultDialog = true
                             } finally {
@@ -408,14 +504,27 @@ fun GerarCartaoDialog(onDismiss: () -> Unit, idcliente: Int) {
                             }
                         }
                     },
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen),
                     enabled = !isLoading
                 ) {
-                    if (isLoading) CircularProgressIndicator(modifier = Modifier.size(20.dp)) else Text("Sim")
+                    if (isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                    } else {
+                        Text("Sim")
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showConfirmacao = false }, enabled = !isLoading) { Text("Não") }
-            }
+                TextButton(
+                    onClick = { showConfirmacao = false },
+                    enabled = !isLoading
+                ) {
+                    Text("Não", color = Color.Gray)
+                }
+            },
+            containerColor = Color.White,
+            titleContentColor = BrandLightGreen,
+            textContentColor = Color.Black
         )
     }
 
@@ -427,35 +536,55 @@ fun GerarCartaoDialog(onDismiss: () -> Unit, idcliente: Int) {
         ) {
             Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Gerar Novo Cartão", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = BrandLightGreen, modifier = Modifier.padding(bottom = 16.dp))
-                
+
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { isTitular = true }) {
-                    RadioButton(selected = isTitular, onClick = { isTitular = true })
+                    RadioButton(selected = isTitular, onClick = { isTitular = true }, colors = RadioButtonDefaults.colors(selectedColor = BrandLightGreen))
                     Text("Titular", color = Color.Black)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { isTitular = false }) {
-                    RadioButton(selected = !isTitular, onClick = { isTitular = false })
+                    RadioButton(selected = !isTitular, onClick = { isTitular = false }, colors = RadioButtonDefaults.colors(selectedColor = BrandLightGreen))
                     Text("Dependente", color = Color.Black)
                 }
 
                 if (!isTitular) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Box(modifier = Modifier.fillMaxWidth().border(1.dp, Color.Gray, RoundedCornerShape(8.dp)).clickable { expanded = true }.padding(12.dp)) {
-                        Text(selectedDependente?.nomeDependente ?: "Selecionar Dependente", color = Color.Black)
-                    }
-                    if (expanded) {
-                        Dialog(onDismissRequest = { expanded = false }) {
-                            Card(shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-                                LazyColumn(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
-                                    if (dependentesList.isEmpty()) {
-                                        item { Text("Nenhum dependente encontrado", color = Color.Gray, modifier = Modifier.padding(8.dp)) }
-                                    } else {
-                                        items(dependentesList) { dep ->
-                                            Text(dep.nomeDependente ?: "Sem Nome", color = Color.Black, modifier = Modifier.fillMaxWidth().clickable {
-                                                selectedDependente = dep
-                                                expanded = false
-                                            }.padding(12.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = { expanded = !expanded }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedDependente?.nomeDependente ?: "Selecione o dependente",
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = BrandLightGreen,
+                                unfocusedBorderColor = Color.LightGray,
+                                focusedTextColor = Color.Black,
+                                unfocusedTextColor = Color.Black
+                            )
+                        )
+
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            if (dependentesList.isEmpty()) {
+                                DropdownMenuItem(
+                                    text = { Text("Nenhum dependente encontrado") },
+                                    onClick = { }
+                                )
+                            } else {
+                                dependentesList.forEach { dep ->
+                                    DropdownMenuItem(
+                                        text = { Text("${dep.nomeDependente} (${dep.parentesco})") },
+                                        onClick = {
+                                            selectedDependente = dep
+                                            expanded = false
                                         }
-                                    }
+                                    )
                                 }
                             }
                         }
@@ -466,15 +595,16 @@ fun GerarCartaoDialog(onDismiss: () -> Unit, idcliente: Int) {
                 Button(
                     onClick = { 
                         if (!isTitular && selectedDependente == null) {
-                            // Poderia mostrar um Toast aqui
+
                         } else {
-                            showConfirmacao = true 
+                            showConfirmacao = true
                         }
-                    }, 
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen)
+                    },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("GERAR CARTÃO", color = Color.White)
+                    Text("GERAR CARTÃO", color = Color.White, fontWeight = FontWeight.Bold)
                 }
                 TextButton(onClick = onDismiss) { Text("Fechar", color = Color.Gray) }
             }

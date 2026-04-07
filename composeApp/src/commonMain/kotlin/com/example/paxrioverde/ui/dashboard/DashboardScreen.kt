@@ -41,6 +41,7 @@ val TextDark = Color(0xFF1F2937)
 @Composable
 fun DashboardScreen(
     userData: LoginResponse?,
+    valorCartao: String? = null,
     onOpenWallet: () -> Unit,
     onOpenBoleto: () -> Unit,
     onOpenReferral: () -> Unit,
@@ -147,12 +148,8 @@ fun DashboardHeader(
                 Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text("Próxima Mensalidade", color = Color.White.copy(alpha = 0.9f), fontSize = 12.sp)
-                        Text(userProxMens, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                         
-                        if (!valorCartao.isNullOrEmpty() && valorCartao != "0,00") {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Crédito Cartão: R$ $valorCartao", color = Color.White.copy(alpha = 0.9f), fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                        }
+                        Text(userProxMens, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     }
                     Button(onClick = onOpenBoleto, colors = ButtonDefaults.buttonColors(containerColor = SurfaceColor)) {
                         Text("Pagar", color = BrandGreen, fontWeight = FontWeight.Bold)
@@ -165,7 +162,7 @@ fun DashboardHeader(
 
 @Composable
 fun HighlightsCarousel(onImageClick: (org.jetbrains.compose.resources.DrawableResource) -> Unit) {
-    val images = listOf(Res.drawable.destaque_imagem_1, Res.drawable.destaque_imagem_2, Res.drawable.destaque_imagem_3)
+    val images = listOf(Res.drawable.destaque_imagem_1, Res.drawable.destaque_imagem_2, Res.drawable.destaque_imagem_3, Res.drawable.destaque_imagem_4)
     val pagerState = rememberPagerState(pageCount = { images.size })
 
     LaunchedEffect(Unit) {

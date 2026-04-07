@@ -41,7 +41,6 @@ fun AppDrawer(
             DrawerMenuItem(Icons.Default.Home, "Início", Screen.Dashboard),
             DrawerMenuItem(Icons.Default.DateRange, "Boletos", Screen.Finance),
             DrawerMenuItem(Icons.Default.Description, "Meu Plano", Screen.Plans),
-            DrawerMenuItem(Icons.Default.Fingerprint, "Entrar com Digital", Screen.Biometrics),
             DrawerMenuItem(Icons.Default.Call, "Fale Conosco", Screen.Contact)
         )
     }

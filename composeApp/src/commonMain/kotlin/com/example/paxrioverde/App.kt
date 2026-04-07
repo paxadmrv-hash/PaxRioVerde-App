@@ -4,6 +4,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import com.example.paxrioverde.api.ApiService
 import com.example.paxrioverde.api.LoginResponse
+import com.example.paxrioverde.api.WalletCache
 import com.example.paxrioverde.ui.benefits.BenefitsScreen
 import com.example.paxrioverde.ui.biometrics.BiometricsScreen
 import com.example.paxrioverde.ui.components.AppDrawer
@@ -57,20 +58,26 @@ fun App() {
     val sessionManager = remember { SessionManager() }
 
     // Efeito para Auto-Login quando o App abre e já tem dados salvos
-    LaunchedEffect(Unit) {
-        if (!isAutoLoginDone) {
-            val savedCpf = sessionManager.getSavedCpf()
-            val savedPass = sessionManager.getSavedPassword()
-            if (savedCpf.isNotEmpty() && savedPass.isNotEmpty()) {
+    fun refreshUserData() {
+        val savedCpf = sessionManager.getSavedCpf()
+        val savedPass = sessionManager.getSavedPassword()
+        if (savedCpf.isNotEmpty() && savedPass.isNotEmpty()) {
+            scope.launch {
                 try {
                     val response = ApiService.login(savedCpf, savedPass)
                     if (response.success) {
                         userData = response
                     }
                 } catch (e: Exception) {
-                    println("Erro auto-login: ${e.message}")
+                    println("Erro ao atualizar dados: ${e.message}")
                 }
             }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!isAutoLoginDone) {
+            refreshUserData()
             isAutoLoginDone = true
         }
     }
@@ -144,8 +151,16 @@ fun App() {
                     Surface(color = MaterialTheme.colorScheme.background) {
                         when (currentScreen) {
                             Screen.Dashboard -> {
+                                val displayValorCartao = if (userData?.valorcartao.isNullOrEmpty() || userData?.valorcartao == "0,00" || userData?.valorcartao == "0.00") {
+                                    if (WalletCache.totalValorCartoes > 0) {
+                                        val total = WalletCache.totalValorCartoes
+                                        if (total % 1.0 == 0.0) "${total.toInt()},00" else "${total}".replace(".", ",")
+                                    } else userData?.valorcartao
+                                } else userData?.valorcartao
+
                                 DashboardScreen(
                                     userData = userData,
+                                    valorCartao = displayValorCartao,
                                     onOpenWallet = { navigateTo(Screen.VirtualCard) },
                                     onOpenBoleto = { navigateTo(Screen.Finance) },
                                     onOpenReferral = { navigateTo(Screen.Referral) },
@@ -171,13 +186,21 @@ fun App() {
                                 FaleConoscoScreen(onBackClick = { goBack() })
                             }
                             Screen.Finance -> {
+                                val displayValorCartao = if (userData?.valorcartao.isNullOrEmpty() || userData?.valorcartao == "0,00" || userData?.valorcartao == "0.00") {
+                                    if (WalletCache.totalValorCartoes > 0) {
+                                        val total = WalletCache.totalValorCartoes
+                                        if (total % 1.0 == 0.0) "${total.toInt()},00" else "${total}".replace(".", ",")
+                                    } else userData?.valorcartao
+                                } else userData?.valorcartao
+
                                 FinanceScreen(
                                     onBackClick = { goBack() },
                                     idcliente = userData?.idcliente ?: 0,
                                     idcaixa = userData?.idcaixa_pix ?: 0,
                                     valorProxMens = userData?.valormens_prox_mens ?: "0,00",
                                     vencProxMens = userData?.prox_mens ?: "--/--/----",
-                                    showBoletoButton = userData?.boleto_prox_mens ?: false
+                                    showBoletoButton = userData?.boleto_prox_mens ?: false,
+                                    valorCartao = displayValorCartao
                                 )
                             }
                             Screen.Notifications -> {
@@ -205,7 +228,16 @@ fun App() {
                             Screen.VirtualCard -> {
                                 VirtualCardScreen(
                                     onBack = { goBack() },
-                                    idcliente = userData?.idcliente ?: 0
+                                    idcliente = userData?.idcliente ?: 0,
+                                    idcontrato = userData?.idcontrato_prox_mens ?: 0,
+                                    idconvenio = userData?.idconvenio_prox_mens ?: 0,
+                                    idmensalidade = userData?.idmensalidade_prox_mens ?: 0,
+                                    idcaixa = userData?.idcaixa_pix ?: 0,
+                                    idfilial = userData?.idfilial ?: 0,
+                                    dtvencimento = userData?.prox_mens ?: "",
+                                    valorCartao = userData?.valorcartao,
+                                    onCardGenerated = { refreshUserData() },
+                                    onNavigateToFinance = { navigateTo(Screen.Finance) }
                                 )
                             }
                             Screen.Laboratorio -> {

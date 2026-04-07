@@ -14,6 +14,11 @@ object WalletCache {
     val loadedBitmaps = mutableStateMapOf<Int, ImageBitmap>()
     var isPreloading by mutableStateOf(false)
 
+    val totalValorCartoes: Double
+        get() = cartoesList.sumOf { 
+            it.valor?.replace(",", ".")?.toDoubleOrNull() ?: 0.0 
+        }
+
     suspend fun preLoad(idcliente: Int, forceRefresh: Boolean = false) {
         if (idcliente == 0) return
         if (isPreloading && !forceRefresh) return

@@ -22,6 +22,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -50,7 +52,8 @@ fun FinanceScreen(
     idcaixa: Int = 0,
     valorProxMens: String = "0,00",
     vencProxMens: String = "--/--/----",
-    showBoletoButton: Boolean = true
+    showBoletoButton: Boolean = true,
+    valorCartao: String? = null
 ) {
     var selectedMensalidade by remember { mutableStateOf<MensalidadeItem?>(null) }
     
@@ -58,6 +61,7 @@ fun FinanceScreen(
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(idcliente) {
         if (idcliente != 0) {
@@ -92,137 +96,194 @@ fun FinanceScreen(
     var showBoletoDialog by remember { mutableStateOf(false) }
     var barCode by remember { mutableStateOf("") }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundGray)
-            .navigationBarsPadding()
-    ) {
-        FinanceHeader(
-            onBackClick = onBackClick,
-            valor = selectedMensalidade?.valormensalidade ?: valorProxMens,
-            vencimento = selectedMensalidade?.dtvencimento ?: vencProxMens,
-            onPixClick = { 
-                val mens = selectedMensalidade ?: historyInvoices.firstOrNull { !it.pago }
-                if (mens != null) {
-                    scope.launch {
-                        isGeneratingPayment = true
-                        try {
-                            // Usando o novo método gerarPix com todos os parâmetros necessários
-                            val pixResponse = ApiService.gerarPix(
-                                idcaixa = idcaixa,
-                                idcontrato = mens.idcontrato,
-                                idconvenio = mens.idconvenio,
-                                dtvencimento = mens.dtvencimento,
-                                idmensalidade = mens.idmensalidade
-                            )
-                            pixCode = pixResponse.pixCode
-                            showPixDialog = true
-                            
-                            // Notificação de geração de pagamento
-                            NotificationCenter.addNotification(
-                                title = "PIX Gerado",
-                                message = "O código para a mensalidade de R$ ${mens.valormensalidade} foi gerado com sucesso.",
-                                type = NotificationType.PAYMENT
-                            )
-                        } catch (e: Exception) {
-                            errorMessage = "Erro ao gerar PIX: ${e.message}"
-                        } finally {
-                            isGeneratingPayment = false
-                        }
-                    }
-                }
-            },
-            onBoletoClick = { 
-                val mens = selectedMensalidade ?: historyInvoices.firstOrNull { !it.pago }
-                if (mens != null) {
-                    scope.launch {
-                        isGeneratingPayment = true
-                        try {
-                            val boletoResponse = ApiService.getBoleto(
-                                idcontrato = mens.idcontrato,
-                                idconvenio = mens.idconvenio,
-                                idmensalidade = mens.idmensalidade
-                            )
-                            if (boletoResponse.success) {
-                                barCode = boletoResponse.codigoBarra ?: "Boleto disponível no PDF"
-                                showBoletoDialog = true
-                                
-                                // Notificação de geração de boleto
-                                NotificationCenter.addNotification(
-                                    title = "Boleto Gerado",
-                                    message = "A linha digitável da mensalidade de R$ ${mens.valormensalidade} já está disponível.",
-                                    type = NotificationType.PAYMENT
-                                )
-                            } else {
-                                errorMessage = boletoResponse.mesAno ?: "Erro ao carregar boleto"
-                            }
-                        } catch (e: Exception) {
-                            errorMessage = "Erro ao carregar boleto: ${e.message}"
-                        } finally {
-                            isGeneratingPayment = false
-                        }
-                    }
-                }
-            },
-            showBoleto = selectedMensalidade?.boleto ?: showBoletoButton,
-            isProcessing = isGeneratingPayment
-        )
+    val currentValorCartao = remember(selectedMensalidade, valorCartao, vencProxMens) {
+        // Só aplica o valor do cartão se:
+        // 1. Não houver mensalidade selecionada (estamos na tela inicial mostrando a "próxima")
+        // 2. OU se a mensalidade selecionada for exatamente a próxima (mesmo vencimento)
+        val isTargetMensalidade = selectedMensalidade == null || selectedMensalidade?.dtvencimento?.trim() == vencProxMens.trim()
+        
+        if (isTargetMensalidade && !valorCartao.isNullOrEmpty() && valorCartao != "0,00" && valorCartao != "0.00" && valorCartao != "0") {
+            valorCartao
+        } else {
+            null
+        }
+    }
 
-        if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = BrandGreen)
-            }
-        } else if (errorMessage != null) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = errorMessage!!, color = Color.Red, textAlign = TextAlign.Center)
-                    Button(onClick = { 
-                        isLoading = true
-                        errorMessage = null
-                        // Tentar recarregar
-                    }, modifier = Modifier.padding(top = 16.dp)) {
-                        Text("Tentar Novamente")
+    val totalValor = remember(selectedMensalidade, valorProxMens, currentValorCartao) {
+        val baseValor = selectedMensalidade?.valormensalidade ?: valorProxMens
+        
+        if (currentValorCartao != null) {
+            try {
+                val base = baseValor.replace(".", "").replace(",", ".").toDouble()
+                val extra = currentValorCartao.replace(".", "").replace(",", ".").toDouble()
+                
+                if (extra > 0.0) {
+                    val total = base + extra
+                    val totalStr = (total).toString().replace(".", ",")
+                    if (totalStr.contains(",")) {
+                        val parts = totalStr.split(",")
+                        val decimals = if (parts[1].length == 1) parts[1] + "0" else parts[1].take(2)
+                        "${parts[0]},$decimals"
+                    } else {
+                        "$totalStr,00"
                     }
+                } else {
+                    baseValor
                 }
+            } catch (e: Exception) {
+                baseValor
             }
         } else {
-            LazyColumn(
-                contentPadding = PaddingValues(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                item {
-                    HistoryHeader(
-                        years = years,
-                        selectedYear = selectedYear,
-                        onYearSelected = { selectedYear = it }
-                    )
-                }
+            baseValor
+        }
+    }
 
-                items(historyInvoices) { item ->
-                    HistoryInvoiceItem(
-                        item = item,
-                        isSelected = selectedMensalidade?.idmensalidade == item.idmensalidade,
-                        onClick = {
-                            if (!item.pago) {
-                                selectedMensalidade = item
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = BackgroundGray
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = padding.calculateBottomPadding())
+                .navigationBarsPadding()
+        ) {
+            FinanceHeader(
+                onBackClick = onBackClick,
+                valor = totalValor,
+                vencimento = selectedMensalidade?.dtvencimento ?: vencProxMens,
+                onPixClick = { 
+                    val mens = selectedMensalidade ?: historyInvoices.firstOrNull { !it.pago }
+                    if (mens != null) {
+                        scope.launch {
+                            isGeneratingPayment = true
+                            try {
+                                val pixResponse = ApiService.gerarPix(
+                                    idcaixa = idcaixa,
+                                    idcontrato = mens.idcontrato,
+                                    idconvenio = mens.idconvenio,
+                                    dtvencimento = mens.dtvencimento,
+                                    idmensalidade = mens.idmensalidade,
+                                    valorCartao = currentValorCartao,
+                                    valorTotal = totalValor
+                                )
+                                pixCode = pixResponse.pixCode
+                                showPixDialog = true
+                                
+                                NotificationCenter.addNotification(
+                                    title = "PIX Gerado",
+                                    message = "O código para a mensalidade de R$ $totalValor foi gerado com sucesso.",
+                                    type = NotificationType.PAYMENT
+                                )
+                            } catch (e: Exception) {
+                                errorMessage = "Erro ao gerar PIX: ${e.message}"
+                            } finally {
+                                isGeneratingPayment = false
                             }
                         }
-                    )
+                    }
+                },
+                onBoletoClick = { 
+                    val mens = selectedMensalidade ?: historyInvoices.firstOrNull { !it.pago }
+                    if (mens != null) {
+                        scope.launch {
+                            isGeneratingPayment = true
+                            try {
+                                val boletoResponse = ApiService.getBoleto(
+                                    idcontrato = mens.idcontrato,
+                                    idconvenio = mens.idconvenio,
+                                    idmensalidade = mens.idmensalidade,
+                                    valorCartao = currentValorCartao,
+                                    valorTotal = totalValor
+                                )
+                                if (boletoResponse.success) {
+                                    barCode = boletoResponse.codigoBarra ?: "Boleto disponível no PDF"
+                                    showBoletoDialog = true
+                                    
+                                    NotificationCenter.addNotification(
+                                        title = "Boleto Gerado",
+                                        message = "A linha digitável da mensalidade de R$ $totalValor já está disponível.",
+                                        type = NotificationType.PAYMENT
+                                    )
+                                } else {
+                                    errorMessage = boletoResponse.mesAno ?: "Erro ao carregar boleto"
+                                }
+                            } catch (e: Exception) {
+                                errorMessage = "Erro ao carregar boleto: ${e.message}"
+                            } finally {
+                                isGeneratingPayment = false
+                            }
+                        }
+                    }
+                },
+                showBoleto = selectedMensalidade?.boleto ?: showBoletoButton,
+                isProcessing = isGeneratingPayment,
+                acrescimoCartao = currentValorCartao
+            )
+
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = BrandGreen)
+                }
+            } else if (errorMessage != null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = errorMessage!!, color = Color.Red, textAlign = TextAlign.Center)
+                        Button(onClick = { 
+                            isLoading = true
+                            errorMessage = null
+                        }, modifier = Modifier.padding(top = 16.dp)) {
+                            Text("Tentar Novamente")
+                        }
+                    }
+                }
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    item {
+                        HistoryHeader(
+                            years = years,
+                            selectedYear = selectedYear,
+                            onYearSelected = { selectedYear = it }
+                        )
+                    }
+
+                    items(historyInvoices) { item ->
+                        HistoryInvoiceItem(
+                            item = item,
+                            isSelected = selectedMensalidade?.idmensalidade == item.idmensalidade,
+                            onClick = {
+                                if (!item.pago) {
+                                    selectedMensalidade = item
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
     }
 
     if (showPixDialog) {
-        PixDialog(pixCode = pixCode, onDismiss = { showPixDialog = false })
+        PixDialog(
+            pixCode = pixCode, 
+            onDismiss = { showPixDialog = false },
+            onCopy = {
+                scope.launch { snackbarHostState.showSnackbar("Código PIX copiado!") }
+            }
+        )
     }
 
     if (showBoletoDialog) {
         BoletoDialog(
             barCode = barCode,
-            onDismiss = { showBoletoDialog = false }
+            onDismiss = { showBoletoDialog = false },
+            onCopy = {
+                scope.launch { snackbarHostState.showSnackbar("Linha digitável copiada!") }
+            }
         )
     }
 }
@@ -235,7 +296,8 @@ fun FinanceHeader(
     onPixClick: () -> Unit,
     onBoletoClick: () -> Unit,
     showBoleto: Boolean,
-    isProcessing: Boolean
+    isProcessing: Boolean,
+    acrescimoCartao: String? = null
 ) {
     Box(
         modifier = Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(BrandGreen, BrandGreenDark))).clip(RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp))
@@ -248,6 +310,17 @@ fun FinanceHeader(
             Text(text = "Mensalidade Selecionada", color = SurfaceWhite.copy(alpha = 0.8f), fontSize = 14.sp)
             Spacer(modifier = Modifier.height(4.dp))
             Text(text = "R$ $valor", color = SurfaceWhite, fontSize = 38.sp, fontWeight = FontWeight.Bold)
+            
+            if (!acrescimoCartao.isNullOrEmpty()) {
+                Text(
+                    text = "+ R$ $acrescimoCartao (Acréscimo Cartão)", 
+                    color = SurfaceWhite.copy(alpha = 0.9f), 
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+            }
+
             Text(text = "Vencimento: $vencimento", color = SurfaceWhite.copy(alpha = 0.9f), fontSize = 14.sp)
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -355,7 +428,8 @@ fun PaymentActionCard(icon: ImageVector, title: String, modifier: Modifier = Mod
 }
 
 @Composable
-fun PixDialog(pixCode: String, onDismiss: () -> Unit) {
+fun PixDialog(pixCode: String, onDismiss: () -> Unit, onCopy: () -> Unit) {
+    val clipboardManager = LocalClipboardManager.current
     Dialog(onDismissRequest = onDismiss) {
         Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -365,7 +439,14 @@ fun PixDialog(pixCode: String, onDismiss: () -> Unit) {
                 Surface(color = BackgroundGray, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(top = 20.dp)) {
                     Text(pixCode, fontSize = 11.sp, modifier = Modifier.padding(12.dp), maxLines = 5)
                 }
-                Button(onClick = { /* Lógica de copiar para o clipboard pode ser adicionada */ }, modifier = Modifier.fillMaxWidth().padding(top = 24.dp), colors = ButtonDefaults.buttonColors(containerColor = BrandGreen)) {
+                Button(
+                    onClick = { 
+                        clipboardManager.setText(AnnotatedString(pixCode))
+                        onCopy()
+                    }, 
+                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp), 
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandGreen)
+                ) {
                     Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Copiar código PIX")
@@ -377,7 +458,8 @@ fun PixDialog(pixCode: String, onDismiss: () -> Unit) {
 }
 
 @Composable
-fun BoletoDialog(barCode: String, onDismiss: () -> Unit) {
+fun BoletoDialog(barCode: String, onDismiss: () -> Unit, onCopy: () -> Unit) {
+    val clipboardManager = LocalClipboardManager.current
     Dialog(onDismissRequest = onDismiss) {
         Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color.White), modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -386,7 +468,14 @@ fun BoletoDialog(barCode: String, onDismiss: () -> Unit) {
                 Surface(color = BackgroundGray, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(top = 20.dp)) {
                     Text(barCode, fontSize = 12.sp, modifier = Modifier.padding(16.dp), textAlign = TextAlign.Center)
                 }
-                Button(onClick = { /* Lógica de copiar */ }, modifier = Modifier.fillMaxWidth().padding(top = 24.dp), colors = ButtonDefaults.buttonColors(containerColor = BrandGreen)) {
+                Button(
+                    onClick = { 
+                        clipboardManager.setText(AnnotatedString(barCode))
+                        onCopy()
+                    }, 
+                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp), 
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandGreen)
+                ) {
                     Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Copiar linha digitável")
