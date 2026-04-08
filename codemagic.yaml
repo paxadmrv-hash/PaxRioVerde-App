@@ -28,7 +28,7 @@ workflows:
 
       - name: Create Export Options
         script: |
-          # Ajuste no method e adição do signingCertificate para evitar erro 70
+          # Criando o arquivo de exportação com as chaves que o Xcode 16+ exige
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -88,7 +88,7 @@ workflows:
             -allowProvisioningOffline=YES | tee build/ios/logs/xcodebuild_raw_log.txt
 
           echo "📦 Gerando arquivo IPA final..."
-          # Forçamos a identidade Apple Distribution aqui para casar com o que o Xcode 16+ espera
+          # Aqui forçamos o override definitivo para evitar o erro "No signing certificate iOS Distribution found"
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
