@@ -57,23 +57,20 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🛠️ Preparando ambiente Pax Rio Verde..."
+          echo "🛠️ Limpando referências e preparando Archive..."
           
-          # 1. PERMISSÕES
           chmod +x gradlew
           
-          # 2. LIMPEZA DE IDENTIDADES NO PROJETO (Força Manual)
+          # Remove identidades fixas para evitar conflitos
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "";/g' {} +
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = ".*";/CODE_SIGN_IDENTITY[sdk=iphoneos*] = "";/g' {} +
 
-          # 3. PREPARAÇÃO DE DIRETÓRIOS
           ./gradlew clean
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
           mkdir -p build/ios/logs
 
-          # 4. ARCHIVE (Sucesso garantido no passo anterior)
           echo "🚀 Executando xcodebuild archive..."
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
@@ -85,17 +82,15 @@ workflows:
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
-            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             -allowProvisioningOffline=YES | tee build/ios/logs/xcodebuild_raw_log.txt
 
-          # 5. EXPORTAR IPA (Xeque-mate com override direto)
           echo "📦 Gerando arquivo IPA final..."
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
             -exportOptionsPlist "/Users/builder/export_options.plist" \
-            -allowProvisioningUpdates \
             CODE_SIGN_IDENTITY="Apple Distribution"
 
     artifacts:
