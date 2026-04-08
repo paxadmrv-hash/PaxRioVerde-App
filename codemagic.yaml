@@ -55,28 +55,26 @@ workflows:
       - name: Build and Sign IPA
         script: |
           #!/usr/bin/env bash
-          # Garante que a falha do xcodebuild não seja ocultada pelo comando 'tee'
           set -e -o pipefail
           
-          echo "🛠️ Preparando build com captura de log detalhado..."
+          echo "🛠️ Aplicando patch de compatibilidade no projeto..."
           
-          # 1. SUBSTITUIÇÃO GLOBAL NO CÓDIGO
-          find . -type f \( -name "*.pbxproj" -o -name "*.plist" -o -name "*.xcconfig" \) -exec sed -i '' 's/iOS Distribution/Apple Distribution/g' {} +
-          find . -type f \( -name "*.pbxproj" -o -name "*.plist" -o -name "*.xcconfig" \) -exec sed -i '' 's/iPhone Distribution/Apple Distribution/g' {} +
+          # 1. SUBSTITUIÇÃO PARA IDENTIDADE GENÉRICA
+          # Trocamos qualquer menção específica por "iPhone Distribution"
+          # Isso "desvicia" o Xcode de procurar o nome antigo ou o novo
+          find . -type f -name "project.pbxproj" -exec sed -i '' 's/iOS Distribution/iPhone Distribution/g' {} +
+          find . -type f -name "project.pbxproj" -exec sed -i '' 's/Apple Distribution/iPhone Distribution/g' {} +
 
-          # 2. FORÇAR VARIÁVEIS NO AMBIENTE DO KOTLIN/GRADLE
-          export CODE_SIGN_IDENTITY="Apple Distribution"
-          export PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID"
-          export DEVELOPMENT_TEAM="$TEAM_ID"
-
-          # 3. LIMPEZA DE CACHE E PREPARAÇÃO DA PASTA DE LOGS
+          # 2. LIMPEZA E PREPARAÇÃO
+          # Como é KMP, o clean do gradle ajuda a evitar lixo de build anterior
+          ./gradlew clean
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
           mkdir -p build/ios/logs
 
-          # 4. ARCHIVE COM OVERRIDE TOTAL E CAPTURA DE LOG
-          echo "🚀 Executando xcodebuild..."
+          # 3. ARCHIVE COM OVERRIDE PARA iPHONE DISTRIBUTION
+          echo "🚀 Executando xcodebuild archive..."
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -84,7 +82,7 @@ workflows:
             -archivePath build/ios/xcarchive/app.xcarchive \
             -destination 'generic/platform=iOS' \
             -resultBundlePath build/ios/logs/PaxBuildLogs.xcresult \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGN_IDENTITY="iPhone Distribution" \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
@@ -92,8 +90,8 @@ workflows:
             -allowProvisioningOffline=YES \
             COMPILER_INDEX_STORE_ENABLE=NO | tee build/ios/logs/xcodebuild_raw_log.txt
 
-          # 5. EXPORTAR IPA
-          echo "📦 Gerando IPA final..."
+          # 4. EXPORTAR IPA
+          echo "📦 Gerando arquivo IPA final..."
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
@@ -102,4 +100,4 @@ workflows:
     artifacts:
       - build/ios/ipa/*.ipa
       - build/ios/logs/xcodebuild_raw_log.txt
-      - build/ios/logs/PaxBuildLogs.xcresult.zip
+      - build/ios/logs/PaxBuildLogs.xcresult
