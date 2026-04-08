@@ -28,14 +28,14 @@ workflows:
 
       - name: Create Export Options
         script: |
-          # Criando o arquivo de exportação com as chaves que o Xcode 16+ exige
+          # Criando o arquivo de exportação forçando o certificado "Apple Distribution"
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>app-store-connect</string>
+              <string>app-store</string>
               <key>teamID</key>
               <string>$TEAM_ID</string>
               <key>provisioningProfiles</key>
@@ -58,11 +58,10 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🛠️ Preparando ambiente e limpando referências..."
-          
+          echo "🛠️ Limpando caches e configurando build..."
           chmod +x gradlew
           
-          # Limpeza de identidades no projeto para não confundir o exportador
+          # Remove referências antigas no projeto que causam o erro de "iOS Distribution"
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "";/g' {} +
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = ".*";/CODE_SIGN_IDENTITY[sdk=iphoneos*] = "";/g' {} +
 
@@ -73,6 +72,7 @@ workflows:
           mkdir -p build/ios/logs
 
           echo "🚀 Executando xcodebuild archive..."
+          # Deixamos a identidade vazia aqui para ele usar o match do Team ID que funcionou no seu log
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -88,7 +88,7 @@ workflows:
             -allowProvisioningOffline=YES | tee build/ios/logs/xcodebuild_raw_log.txt
 
           echo "📦 Gerando arquivo IPA final..."
-          # Aqui forçamos o override definitivo para evitar o erro "No signing certificate iOS Distribution found"
+          # Aqui forçamos o nome moderno "Apple Distribution" para matar o erro 70
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
