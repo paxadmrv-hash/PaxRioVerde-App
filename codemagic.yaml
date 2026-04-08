@@ -34,7 +34,7 @@ workflows:
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>app-store</string>
+              <string>app-store-connect</string>
               <key>teamID</key>
               <string>$TEAM_ID</string>
               <key>provisioningProfiles</key>
@@ -44,6 +44,8 @@ workflows:
               </dict>
               <key>signingStyle</key>
               <string>manual</string>
+              <key>signingCertificate</key>
+              <string>Apple Distribution</string>
               <key>manageAppVersionAndBuildNumber</key>
               <true/>
           </dict>
@@ -73,7 +75,6 @@ workflows:
           mkdir -p build/ios/logs
 
           # 4. ARCHIVE USANDO APENAS O TEAM ID E O PROVISIONING PROFILE
-          # Note que deixamos CODE_SIGN_IDENTITY vazio no comando para ele buscar o melhor match pelo TEAM_ID
           echo "🚀 Executando xcodebuild archive..."
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
