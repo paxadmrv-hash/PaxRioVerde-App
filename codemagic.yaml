@@ -30,6 +30,7 @@ workflows:
 
       - name: Create Export Options
         script: |
+          # Criando o arquivo de exportação com foco total em assinatura manual
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -46,6 +47,8 @@ workflows:
               </dict>
               <key>signingStyle</key>
               <string>manual</string>
+              <key>signingCertificate</key>
+              <string>Apple Distribution</string>
               <key>manageAppVersionAndBuildNumber</key>
               <true/>
           </dict>
@@ -56,18 +59,22 @@ workflows:
         script: |
           #!/usr/bin/env bash
           
-          echo "🛠️ Executando limpeza profunda de assinaturas no .pbxproj..."
+          echo "🛠️ Iniciando Saneamento Radical para a Pax Rio Verde..."
           
-          # 1. DELEÇÃO DE LINHAS (Modo Root)
-          # Removemos qualquer linha que defina CODE_SIGN_IDENTITY ou PROVISIONING_PROFILE
-          # Isso limpa o "vício" de procurar por 'iOS Distribution'
+          # 1. FORÇAR SUBSTITUIÇÃO E LIMPEZA (No .pbxproj)
+          # Substituímos qualquer menção a nomes legados por 'Apple Distribution'
+          find . -type f -name "project.pbxproj" -exec sed -i '' 's/iOS Distribution/Apple Distribution/g' {} +
+          find . -type f -name "project.pbxproj" -exec sed -i '' 's/iPhone Distribution/Apple Distribution/g' {} +
+          
+          # Deletamos as linhas que "travam" identidades antigas no arquivo do projeto
           find . -type f -name "project.pbxproj" -exec sed -i '' '/CODE_SIGN_IDENTITY/d' {} +
           find . -type f -name "project.pbxproj" -exec sed -i '' '/PROVISIONING_PROFILE/d' {} +
           
-          # Força o estilo manual em todas as configurações
+          # Força o estilo de provisionamento Manual em todas as configurações
           find . -name "project.pbxproj" -exec sed -i '' "s/ProvisioningStyle = [a-zA-Z]*;/ProvisioningStyle = Manual;/g" {} +
 
           # 2. CRIAR XC_CONFIG DE EMERGÊNCIA
+          # Isso sobrescreve qualquer configuração que tenha sobrado no Xcode
           cat > /Users/builder/release.xcconfig <<EOF
           CODE_SIGN_IDENTITY = Apple Distribution
           CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution
@@ -76,13 +83,19 @@ workflows:
           CODE_SIGN_STYLE = Manual
           EOF
 
-          # 3. LIMPEZA DE CACHE
+          # 3. FORÇAR VARIÁVEIS DE AMBIENTE GLOBAIS
+          # Isso garante que até os scripts internos do Kotlin (embedAndSign) vejam a assinatura correta
+          export CODE_SIGN_IDENTITY="Apple Distribution"
+          export PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID"
+          export DEVELOPMENT_TEAM="$TEAM_ID"
+          export CODE_SIGN_STYLE="Manual"
+
+          # 4. LIMPEZA DE CACHE
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          # 4. ARCHIVE
-          # Passamos o xcconfig E os parâmetros de linha de comando para não dar margem ao erro
+          # 5. ARCHIVE (Injetando tudo via xcconfig e parâmetros de linha de comando)
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -97,7 +110,7 @@ workflows:
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             -allowProvisioningOffline=YES
 
-          # 5. EXPORTAR IPA
+          # 6. EXPORTAR IPA
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
