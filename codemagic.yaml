@@ -65,23 +65,29 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          # 1. IDENTIFICAR ONDE O ERRO ESTÁ ESCONDIDO
-          echo "🔍 Caçando o termo 'iOS Distribution' em todos os arquivos..."
-          grep -r "iOS Distribution" . --exclude="codemagic.yaml" || true
+          # 1. LIMPEZA TOTAL DE CONFIGURAÇÕES DE ASSINATURA
+          echo "🧹 Eliminando conflitos de identidade no arquivo do projeto..."
 
-          # 2. LIMPEZA TOTAL (PBXPROJ + XCCONFIG + PLIST)
-          echo "🛠️ Aplicando correção em todos os arquivos de configuração..."
-          find . -type f \( -name "*.pbxproj" -o -name "*.xcconfig" -o -name "*.plist" \) -exec sed -i '' "s/iOS Distribution/Apple Distribution/g" {} +
-          find . -type f \( -name "*.pbxproj" -o -name "*.xcconfig" -o -name "*.plist" \) -exec sed -i '' "s/iPhone Distribution/Apple Distribution/g" {} +
-          find . -name "*.pbxproj" -exec sed -i '' "s/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g" {} +
+          # Deleta qualquer linha que defina CODE_SIGN_IDENTITY ou PROVISIONING_PROFILE
+          # Isso remove as travas que forçam o nome "iOS Distribution"
+          find . -name "project.pbxproj" -exec sed -i '' '/CODE_SIGN_IDENTITY/d' {} +
+          find . -name "project.pbxproj" -exec sed -i '' '/PROVISIONING_PROFILE/d' {} +
 
-          # 3. RESET DE CACHE DO SISTEMA DE BUILD
-          echo "🧹 Limpando caches do Xcode e Gradle..."
+          # Força o estilo manual em todas as configurações (Release/Debug)
+          find . -name "project.pbxproj" -exec sed -i '' "s/ProvisioningStyle = [a-zA-Z]*;/ProvisioningStyle = Manual;/g" {} +
+
+          # 2. LIMPEZA DE CACHE DO SISTEMA
+          echo "🧹 Resetando caches do Xcode..."
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
-          chmod +x gradlew
-          ./gradlew clean
+          rm -rf build/ios
 
-          # 4. ARCHIVE COM OVERRIDE TOTAL
+          # 3. VERIFICAÇÃO NO LOG (Para a nossa análise)
+          echo "🔍 Conferindo se sobrou algum 'iOS Distribution' escondido:"
+          grep -r "iOS Distribution" . --exclude-dir=".gradle" || echo "✅ Limpo!"
+
+          # 4. ARCHIVE COM OVERRIDE ABSOLUTO
+          # Passamos a identidade duas vezes: uma geral e uma específica para o SDK, 
+          # para garantir que o Xcode não use nenhum padrão antigo.
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -89,6 +95,7 @@ workflows:
             -archivePath build/ios/xcarchive/app.xcarchive \
             -destination 'generic/platform=iOS' \
             CODE_SIGN_IDENTITY="Apple Distribution" \
+            "CODE_SIGN_IDENTITY[sdk=iphoneos*]"="Apple Distribution" \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
