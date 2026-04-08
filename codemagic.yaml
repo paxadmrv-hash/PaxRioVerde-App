@@ -56,9 +56,14 @@ workflows:
         script: |
           #!/usr/bin/env bash
           
-          # 1. CRIAR O ARQUIVO DE OVERRIDE MESTRE (.xcconfig)
-          # Sintaxe corrigida para o Xcode 16 (sem aspas nos seletores)
-          echo "🛠️ Criando configuração mestre de assinatura..."
+          # 1. FORÇAR A TROCA DENTRO DOS ARQUIVOS DO PROJETO
+          # Isso resolve o problema onde o Xcode ignora o comando do terminal
+          echo "🛠️ Corrigindo nomes de certificados dentro dos arquivos do projeto..."
+          find . -type f -name "*.pbxproj" -exec sed -i '' 's/iOS Distribution/Apple Distribution/g' {} +
+          find . -type f -name "*.pbxproj" -exec sed -i '' 's/iPhone Distribution/Apple Distribution/g' {} +
+
+          # 2. CRIAR O ARQUIVO DE OVERRIDE MESTRE (.xcconfig)
+          echo "📝 Criando configuração mestre..."
           cat > /Users/builder/force_signing.xcconfig <<EOF
           CODE_SIGN_IDENTITY = Apple Distribution
           CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution
@@ -67,18 +72,13 @@ workflows:
           CODE_SIGN_STYLE = Manual
           EOF
 
-          # 2. FORÇAR VARIÁVEIS NO AMBIENTE (Global Override para o Kotlin)
-          export CODE_SIGN_IDENTITY="Apple Distribution"
-          export DEVELOPMENT_TEAM="$TEAM_ID"
-          export PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID"
-
           # 3. LIMPEZA DE CACHE
           echo "🧹 Limpando resíduos antigos..."
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          # 4. ARCHIVE USANDO O XCCONFIG MESTRE
+          # 4. ARCHIVE (Forçando o uso do xcconfig e desativando assinaturas automáticas)
           echo "🚀 Iniciando xcodebuild archive..."
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
@@ -87,8 +87,8 @@ workflows:
             -archivePath build/ios/xcarchive/app.xcarchive \
             -destination 'generic/platform=iOS' \
             -xcconfig /Users/builder/force_signing.xcconfig \
-            PRODUCT_BUNDLE_IDENTIFIER="$APP_ID" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGN_STYLE="Manual" \
             -allowProvisioningOffline=YES
 
           # 5. EXPORTAR IPA
