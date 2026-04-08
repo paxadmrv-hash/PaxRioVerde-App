@@ -57,23 +57,24 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🛠️ Aplicando patch de compatibilidade no projeto..."
+          echo "🛠️ Aplicando patch de compatibilidade e permissões..."
           
-          # 1. SUBSTITUIÇÃO PARA IDENTIDADE GENÉRICA
-          # Trocamos qualquer menção específica por "iPhone Distribution"
-          # Isso "desvicia" o Xcode de procurar o nome antigo ou o novo
+          # 1. CORREÇÃO DE PERMISSÃO (O erro estava aqui)
+          # Dá permissão de execução para o Gradle wrapper
+          chmod +x gradle we
+          
+          # 2. SUBSTITUIÇÃO PARA IDENTIDADE GENÉRICA
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/iOS Distribution/iPhone Distribution/g' {} +
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/Apple Distribution/iPhone Distribution/g' {} +
 
-          # 2. LIMPEZA E PREPARAÇÃO
-          # Como é KMP, o clean do gradle ajuda a evitar lixo de build anterior
+          # 3. LIMPEZA E PREPARAÇÃO
           ./gradlew clean
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
           mkdir -p build/ios/logs
 
-          # 3. ARCHIVE COM OVERRIDE PARA iPHONE DISTRIBUTION
+          # 4. ARCHIVE COM OVERRIDE
           echo "🚀 Executando xcodebuild archive..."
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
@@ -90,7 +91,7 @@ workflows:
             -allowProvisioningOffline=YES \
             COMPILER_INDEX_STORE_ENABLE=NO | tee build/ios/logs/xcodebuild_raw_log.txt
 
-          # 4. EXPORTAR IPA
+          # 5. EXPORTAR IPA
           echo "📦 Gerando arquivo IPA final..."
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
