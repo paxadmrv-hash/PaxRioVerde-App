@@ -1,50 +1,98 @@
-scripts:
-  - name: Build and Sign IPA
-    script: |
-      #!/usr/bin/env bash
-      set -e # Para o script se qualquer comando falhar
+workflows:
+  ios-workflow:
+    name: Pax Rio Verde iOS Final Build
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      groups:
+        - "Pax Rio Verde"
+      vars:
+        XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
+        XCODE_SCHEME: "iosApp"
+        APP_ID: "br.com.paxrioverde.app"
+        TEAM_ID: "264TWUW2L6"
+        PROV_NAME: "Pax_Rio_Verde_Final"
+        PROV_UUID: "f83a914d-202a-436e-9e51-257ae86fccd0"
+    scripts:
+      - name: Initialize Keychain
+        script: keychain initialize
 
-      echo "🧹 Iniciando limpeza profunda do ambiente..."
-      
-      # 1. PREPARAÇÃO DE PASTAS
-      mkdir -p build/ios/xcarchive
-      mkdir -p build/ios/ipa
+      - name: Install Credentials
+        script: |
+          # 1. Instala o Certificado P12
+          echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
+          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
+          
+          # 2. Instala o Perfil de Provisionamento
+          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILES_DIR"
+          echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
+          
+          # 3. LIMPEZA TOTAL: PBXPROJ + XCCONFIG + PLIST
+          # Altera em todos os arquivos do projeto para garantir que o nome antigo não persista
+          find . -type f \( -name "*.pbxproj" -o -name "*.xcconfig" -o -name "*.plist" \) -exec sed -i '' "s/iOS Distribution/Apple Distribution/g" {} +
+          find . -type f \( -name "*.pbxproj" -o -name "*.xcconfig" -o -name "*.plist" \) -exec sed -i '' "s/iPhone Distribution/Apple Distribution/g" {} +
+          find . -name "*.pbxproj" -exec sed -i '' "s/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g" {} +
+          
+          echo "Projeto Xcode saneado totalmente para Apple Distribution."
 
-      # 2. SANEAMENTO RADICAL (Remove travas de nomes antigos)
-      # Deleta linhas de CODE_SIGN_IDENTITY e PROVISIONING_PROFILE em arquivos do projeto e configs
-      echo "🛠️ Removendo referências fixas de assinatura..."
-      find . -type f \( -name "*.pbxproj" -o -name "*.xcconfig" -o -name "*.plist" \) -exec sed -i '' '/CODE_SIGN_IDENTITY/d' {} +
-      find . -type f \( -name "*.pbxproj" -o -name "*.xcconfig" -o -name "*.plist" \) -exec sed -i '' '/PROVISIONING_PROFILE/d' {} +
-      
-      # Força o Estilo Manual e o Team ID correto em todo o projeto
-      find . -name "project.pbxproj" -exec sed -i '' "s/ProvisioningStyle = [a-zA-Z]*;/ProvisioningStyle = Manual;/g" {} +
-      find . -name "project.pbxproj" -exec sed -i '' "s/DEVELOPMENT_TEAM = [A-Z0-9]*;/DEVELOPMENT_TEAM = $TEAM_ID;/g" {} +
+      - name: Create Export Options
+        script: |
+          cat > /Users/builder/export_options.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>teamID</key>
+              <string>$TEAM_ID</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>$APP_ID</key>
+                  <string>$PROV_NAME</string>
+              </dict>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>manageAppVersionAndBuildNumber</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
 
-      # 3. LIMPEZA DE CACHE DO XCODE
-      echo "🧹 Limpando caches do Xcode..."
-      rm -rf ~/Library/Developer/Xcode/DerivedData/*
-      
-      # 4. EXECUÇÃO DO ARCHIVE (O segredo está em não usar aspas complexas aqui)
-      echo "🚀 Iniciando xcodebuild archive..."
-      xcodebuild clean archive \
-        -project "$XCODE_PROJECT" \
-        -scheme "$XCODE_SCHEME" \
-        -configuration Release \
-        -archivePath build/ios/xcarchive/app.xcarchive \
-        -destination 'generic/platform=iOS' \
-        CODE_SIGN_STYLE=Manual \
-        DEVELOPMENT_TEAM=$TEAM_ID \
-        CODE_SIGN_IDENTITY="Apple Distribution" \
-        PROVISIONING_PROFILE_SPECIFIER=$PROV_UUID \
-        PRODUCT_BUNDLE_IDENTIFIER=$APP_ID \
-        AD_HOC_CODE_SIGNING_ALLOWED=YES \
-        -allowProvisioningOffline=YES
+      - name: Build and Sign IPA
+        script: |
+          # 1. LIMPEZA E PREPARAÇÃO
+          echo "🧹 Limpando configurações de assinatura e caches..."
+          find . -name "project.pbxproj" -exec sed -i '' '/CODE_SIGN_IDENTITY/d' {} +
+          find . -name "project.pbxproj" -exec sed -i '' '/PROVISIONING_PROFILE/d' {} +
+          find . -name "project.pbxproj" -exec sed -i '' "s/ProvisioningStyle = [a-zA-Z]*;/ProvisioningStyle = Manual;/g" {} +
 
-      # 5. EXPORTAÇÃO DO IPA
-      echo "📦 Exportando arquivo IPA final..."
-      xcodebuild -exportArchive \
-        -archivePath build/ios/xcarchive/app.xcarchive \
-        -exportPath build/ios/ipa \
-        -exportOptionsPlist "/Users/builder/export_options.plist"
+          rm -rf ~/Library/Developer/Xcode/DerivedData/*
+          mkdir -p build/ios/xcarchive
+          mkdir -p build/ios/ipa
+
+          # 2. ARCHIVE (Com sintaxe simplificada para evitar erros de shell)
+          # Aqui forçamos a identidade "Apple Distribution" de forma limpa
+          xcodebuild clean archive \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -archivePath build/ios/xcarchive/app.xcarchive \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGN_STYLE="Manual" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
+            PRODUCT_BUNDLE_IDENTIFIER="$APP_ID" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            -allowProvisioningOffline=YES
+
+          # 3. EXPORTAR IPA
+          xcodebuild -exportArchive \
+            -archivePath build/ios/xcarchive/app.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist "/Users/builder/export_options.plist"
+
     artifacts:
       - build/ios/ipa/*.ipa
