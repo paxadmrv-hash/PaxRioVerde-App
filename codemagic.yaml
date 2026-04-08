@@ -57,24 +57,24 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🛠️ Aplicando Override técnico por Team ID..."
+          echo "🛠️ Corrigindo permissões e limpando referências antigas..."
           
           # 1. PERMISSÕES
           chmod +x gradlew
           
-          # 2. LIMPEZA RADICAL DO PROJETO
-          # Removemos qualquer valor de CODE_SIGN_IDENTITY para o Xcode usar o padrão do sistema
+          # 2. LIMPEZA DE IDENTIDADES NO PROJETO
+          # Removemos qualquer nome fixo para o Xcode não se confundir no Archive
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "";/g' {} +
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = ".*";/CODE_SIGN_IDENTITY[sdk=iphoneos*] = "";/g' {} +
 
-          # 3. LIMPEZA E PREPARAÇÃO
+          # 3. PREPARAÇÃO DE DIRETÓRIOS
           ./gradlew clean
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
           mkdir -p build/ios/logs
 
-          # 4. ARCHIVE USANDO APENAS O TEAM ID E O PROVISIONING PROFILE
+          # 4. ARCHIVE (Geração do binário assinado)
           echo "🚀 Executando xcodebuild archive..."
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
@@ -90,12 +90,13 @@ workflows:
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             -allowProvisioningOffline=YES | tee build/ios/logs/xcodebuild_raw_log.txt
 
-          # 5. EXPORTAR IPA
+          # 5. EXPORTAR IPA (Xeque-mate na assinatura)
           echo "📦 Gerando arquivo IPA final..."
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
-            -exportOptionsPlist "/Users/builder/export_options.plist"
+            -exportOptionsPlist "/Users/builder/export_options.plist" \
+            CODE_SIGN_IDENTITY="Apple Distribution"
 
     artifacts:
       - build/ios/ipa/*.ipa
