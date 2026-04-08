@@ -34,7 +34,7 @@ workflows:
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>app-store</string>
+              <string>app-store-connect</string>
               <key>teamID</key>
               <string>$TEAM_ID</string>
               <key>provisioningProfiles</key>
@@ -57,21 +57,22 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🛠️ Limpando referências e preparando Archive..."
+          echo "🛠️ Normalizando identidades de assinatura..."
           
           chmod +x gradlew
           
-          # Remove identidades fixas para evitar conflitos
-          find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "";/g' {} +
-          find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = ".*";/CODE_SIGN_IDENTITY[sdk=iphoneos*] = "";/g' {} +
+          # Removemos qualquer referência a nomes antigos ou fixos no arquivo do projeto
+          find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "Apple Distribution";/g' {} +
+          find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = ".*";/CODE_SIGN_IDENTITY[sdk=iphoneos*] = "Apple Distribution";/g' {} +
 
+          # Limpeza de ambiente
           ./gradlew clean
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
           mkdir -p build/ios/logs
 
-          echo "🚀 Executando xcodebuild archive..."
+          echo "🚀 Gerando XCARCHIVE..."
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -86,14 +87,10 @@ workflows:
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             -allowProvisioningOffline=YES | tee build/ios/logs/xcodebuild_raw_log.txt
 
-          echo "📦 Gerando arquivo IPA final..."
+          echo "📦 Exportando IPA final (Xeque-mate)..."
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
             -exportOptionsPlist "/Users/builder/export_options.plist" \
-            CODE_SIGN_IDENTITY="Apple Distribution"
-
-    artifacts:
-      - build/ios/ipa/*.ipa
-      - build/ios/logs/xcodebuild_raw_log.txt
-      - build/ios/logs/PaxBuildLogs.xcresult
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            -allowProvisioningUpdates
