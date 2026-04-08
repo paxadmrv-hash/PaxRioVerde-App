@@ -28,13 +28,14 @@ workflows:
 
       - name: Create Export Options
         script: |
+          # Criando o arquivo de exportação com as chaves que o Xcode 16+ exige
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>app-store</string>
+              <string>app-store-connect</string>
               <key>teamID</key>
               <string>$TEAM_ID</string>
               <key>provisioningProfiles</key>
@@ -55,23 +56,22 @@ workflows:
       - name: Build and Sign IPA
         script: |
           #!/usr/bin/env bash
+          set -e -o pipefail
           
-          echo "🛠️ Executando saneamento e preparando logs..."
+          echo "🛠️ Preparando ambiente e limpando referências..."
           
-          # 1. LIMPEZA RADICAL NO PBXPROJ
-          # Removemos qualquer menção a 'iOS Distribution' ou chaves fixas que travam a build
-          find . -type f -name "project.pbxproj" -exec sed -i '' 's/iOS Distribution/Apple Distribution/g' {} +
-          find . -type f -name "project.pbxproj" -exec sed -i '' '/CODE_SIGN_IDENTITY/d' {} +
-          find . -type f -name "project.pbxproj" -exec sed -i '' '/PROVISIONING_PROFILE/d' {} +
-          find . -name "project.pbxproj" -exec sed -i '' "s/ProvisioningStyle = [a-zA-Z]*;/ProvisioningStyle = Manual;/g" {} +
+          chmod +x gradlew
+          
+          # Limpeza de identidades no projeto para não confundir o exportador
+          find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "";/g' {} +
+          find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = ".*";/CODE_SIGN_IDENTITY[sdk=iphoneos*] = "";/g' {} +
 
-          # 2. LIMPEZA DE CACHE E PASTAS
+          ./gradlew clean
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
-          mkdir -p build/ios/logs # <-- PASTA DE LOGS CRIADA
+          mkdir -p build/ios/logs
 
-          # 3. ARCHIVE COM CAPTURA DE LOG (O 'tee' grava e o '-resultBundlePath' gera o relatório da Apple)
           echo "🚀 Executando xcodebuild archive..."
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
@@ -80,21 +80,22 @@ workflows:
             -archivePath build/ios/xcarchive/app.xcarchive \
             -destination 'generic/platform=iOS' \
             -resultBundlePath build/ios/logs/PaxBuildLogs.xcresult \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
+            CODE_SIGN_IDENTITY="" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            -allowProvisioningOffline=YES \
-            COMPILER_INDEX_STORE_ENABLE=NO | tee build/ios/logs/xcodebuild_raw_log.txt
+            -allowProvisioningOffline=YES | tee build/ios/logs/xcodebuild_raw_log.txt
 
-          # 4. EXPORTAR IPA
+          echo "📦 Gerando arquivo IPA final..."
+          # Aqui forçamos o override definitivo para evitar o erro "No signing certificate iOS Distribution found"
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
-            -exportOptionsPlist "/Users/builder/export_options.plist"
+            -exportOptionsPlist "/Users/builder/export_options.plist" \
+            CODE_SIGN_IDENTITY="Apple Distribution"
 
     artifacts:
       - build/ios/ipa/*.ipa
-      - build/ios/logs/xcodebuild_raw_log.txt  # <-- LOG PARA DOWNLOAD
-      - build/ios/logs/PaxBuildLogs.xcresult   # <-- RELATÓRIO COMPLETO
+      - build/ios/logs/xcodebuild_raw_log.txt
+      - build/ios/logs/PaxBuildLogs.xcresult
