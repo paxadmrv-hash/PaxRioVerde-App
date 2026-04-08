@@ -30,7 +30,6 @@ workflows:
 
       - name: Create Export Options
         script: |
-          # Criando o arquivo de exportação com foco total em assinatura manual
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -47,8 +46,6 @@ workflows:
               </dict>
               <key>signingStyle</key>
               <string>manual</string>
-              <key>signingCertificate</key>
-              <string>Apple Distribution</string>
               <key>manageAppVersionAndBuildNumber</key>
               <true/>
           </dict>
@@ -59,29 +56,32 @@ workflows:
         script: |
           #!/usr/bin/env bash
           
-          echo "🛠️ Iniciando Saneamento Radical para a Pax Rio Verde..."
+          echo "🧹 Iniciando limpeza profunda no arquivo do projeto..."
           
-          # 1. FORÇAR SUBSTITUIÇÃO DE TEXTO (Geral)
-          find . -type f -name "project.pbxproj" -exec sed -i '' 's/iOS Distribution/Apple Distribution/g' {} +
-          find . -type f -name "project.pbxproj" -exec sed -i '' 's/iPhone Distribution/Apple Distribution/g' {} +
-          
-          # 2. DELETAR DEFINIÇÕES CONFLITANTES
-          # Removemos as linhas que "travam" a identidade e o perfil no projeto
+          # 1. DELEÇÃO AGRESSIVA DE CONFIGURAÇÕES
+          # Removemos qualquer linha que defina a identidade ou o perfil no .pbxproj
+          # Isso obriga o Xcode a usar os parâmetros que enviaremos no comando
           find . -type f -name "project.pbxproj" -exec sed -i '' '/CODE_SIGN_IDENTITY/d' {} +
           find . -type f -name "project.pbxproj" -exec sed -i '' '/PROVISIONING_PROFILE/d' {} +
+          find . -type f -name "project.pbxproj" -exec sed -i '' '/CODE_SIGN_STYLE/d' {} +
           
-          # 3. FORÇAR VARIÁVEIS DE AMBIENTE GLOBAIS
-          # Isso garante que até os scripts internos do Kotlin vejam a assinatura correta
+          # Força o Provisioning Style como Manual em tudo
+          find . -name "project.pbxproj" -exec sed -i '' "s/ProvisioningStyle = [a-zA-Z]*;/ProvisioningStyle = Manual;/g" {} +
+
+          # 2. INJEÇÃO VIA VARIÁVEIS DE AMBIENTE (Global Override)
+          # Isso garante que o script 'Compile Kotlin Framework' herde a assinatura
+          export CODE_SIGNING_REQUIRED=YES
           export CODE_SIGN_IDENTITY="Apple Distribution"
           export PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID"
           export DEVELOPMENT_TEAM="$TEAM_ID"
 
-          # 4. LIMPEZA DE CACHE
+          # 3. LIMPEZA DE CACHE DO XCODE
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          # 5. ARCHIVE (Injetando tudo via linha de comando para não dar margem ao erro)
+          # 4. ARCHIVE
+          # Usamos o sinalizador -allowProvisioningOffline para evitar que o Xcode tente validar via rede
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -93,9 +93,10 @@ workflows:
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            -allowProvisioningOffline=YES
+            -allowProvisioningOffline=YES \
+            -allowProvisioningUpdates=NO
 
-          # 6. EXPORTAR IPA
+          # 5. EXPORTAR IPA
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
