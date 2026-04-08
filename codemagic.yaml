@@ -57,11 +57,10 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🛠️ Aplicando patch de compatibilidade e permissões..."
+          echo "🛠️ Corrigindo permissões e aplicando patch de assinatura..."
           
-          # 1. CORREÇÃO DE PERMISSÃO (O erro estava aqui)
-          # Dá permissão de execução para o Gradle wrapper
-          chmod +x gradle we
+          # 1. CORREÇÃO DE PERMISSÃO (Agora sem erro de digitação)
+          chmod +x gradlew
           
           # 2. SUBSTITUIÇÃO PARA IDENTIDADE GENÉRICA
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/iOS Distribution/iPhone Distribution/g' {} +
