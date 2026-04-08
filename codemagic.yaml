@@ -56,32 +56,30 @@ workflows:
         script: |
           #!/usr/bin/env bash
           
-          echo "🛠️ Aplicando faxina pesada no projeto..."
-          
-          # 1. REMOÇÃO FÍSICA DE CONFIGURAÇÕES (O "Grito" de Suporte)
-          # Em vez de trocar, vamos DELETAR as linhas que definem a identidade.
-          # Isso limpa qualquer rastro de "iOS Distribution" ou "iPhone Distribution".
-          find . -type f -name "project.pbxproj" -exec sed -i '' '/CODE_SIGN_IDENTITY/d' {} +
-          find . -type f -name "project.pbxproj" -exec sed -i '' '/PROVISIONING_PROFILE/d' {} +
-          
-          # Força o Provisionamento Manual em tudo
-          find . -name "project.pbxproj" -exec sed -i '' "s/ProvisioningStyle = [a-zA-Z]*;/ProvisioningStyle = Manual;/g" {} +
+          # 1. FORÇAR A TROCA DENTRO DOS ARQUIVOS DO PROJETO
+          # Isso resolve o problema onde o Xcode ignora o comando do terminal
+          echo "🛠️ Corrigindo nomes de certificados dentro dos arquivos do projeto..."
+          find . -type f -name "*.pbxproj" -exec sed -i '' 's/iOS Distribution/Apple Distribution/g' {} +
+          find . -type f -name "*.pbxproj" -exec sed -i '' 's/iPhone Distribution/Apple Distribution/g' {} +
 
-          # 2. CRIAR O ARQUIVO DE OVERRIDE MESTRE
+          # 2. CRIAR O ARQUIVO DE OVERRIDE MESTRE (.xcconfig)
+          echo "📝 Criando configuração mestre..."
           cat > /Users/builder/force_signing.xcconfig <<EOF
           CODE_SIGN_IDENTITY = Apple Distribution
           CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution
-          DEVELOPMENT_TEAM = $TEAM_ID
           PROVISIONING_PROFILE_SPECIFIER = $PROV_UUID
+          DEVELOPMENT_TEAM = $TEAM_ID
           CODE_SIGN_STYLE = Manual
           EOF
 
-          # 3. LIMPEZA TOTAL
+          # 3. LIMPEZA DE CACHE
+          echo "🧹 Limpando resíduos antigos..."
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          # 4. ARCHIVE (Usando o xcconfig para preencher o vazio que deixamos no projeto)
+          # 4. ARCHIVE (Forçando o uso do xcconfig e desativando assinaturas automáticas)
+          echo "🚀 Iniciando xcodebuild archive..."
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -89,11 +87,12 @@ workflows:
             -archivePath build/ios/xcarchive/app.xcarchive \
             -destination 'generic/platform=iOS' \
             -xcconfig /Users/builder/force_signing.xcconfig \
-            PRODUCT_BUNDLE_IDENTIFIER="$APP_ID" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGN_STYLE="Manual" \
             -allowProvisioningOffline=YES
 
           # 5. EXPORTAR IPA
+          echo "📦 Gerando o arquivo IPA final..."
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
