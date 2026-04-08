@@ -28,13 +28,13 @@ workflows:
           mkdir -p "$PROFILES_DIR"
           echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
           
-          # 3. SANEAMENTO FINAL: Força a assinatura manual e o Apple Distribution em todos os lugares
-          # Se o Xcode teimar com "iOS Distribution", nós forçamos o nome correto no arquivo do projeto
-          find . -name "project.pbxproj" -exec sed -i '' "s/iOS Distribution/Apple Distribution/g" {} +
-          find . -name "project.pbxproj" -exec sed -i '' "s/iPhone Distribution/Apple Distribution/g" {} +
+          # 3. LIMPEZA RADICAL: Remove configurações de assinatura que causam conflito
+          # Removemos todas as linhas de CODE_SIGN_IDENTITY para forçar o uso do que passamos no comando de build
+          find . -name "project.pbxproj" -exec sed -i '' '/CODE_SIGN_IDENTITY/d' {} +
           find . -name "project.pbxproj" -exec sed -i '' "s/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g" {} +
+          find . -name "project.pbxproj" -exec sed -i '' "s/DEVELOPMENT_TEAM = [A-Z0-9]*;/DEVELOPMENT_TEAM = $TEAM_ID;/g" {} +
           
-          echo "Projeto Xcode preparado com Apple Distribution e assinatura manual."
+          echo "Projeto Xcode saneado radicalmente para evitar 'iOS Distribution'."
 
       - name: Create Export Options
         script: |
@@ -65,23 +65,27 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          # 1. LIMPEZA DE CACHE DO XCODE (Onde o erro costuma se esconder)
-          echo "🧹 Limpando DerivedData e caches para garantir build limpo..."
+          # 1. LIMPEZA RADICAL DO PROJETO (Onde o erro costuma se esconder)
+          echo "🧹 Removendo configurações de assinatura antigas do arquivo pbxproj..."
+          
+          # Remove todas as linhas que definem CODE_SIGN_IDENTITY para o Xcode parar de procurar "iOS Distribution"
+          find . -name "project.pbxproj" -exec sed -i '' '/CODE_SIGN_IDENTITY/d' {} +
+          
+          # Força o estilo manual e o Team ID em todas as configurações
+          find . -name "project.pbxproj" -exec sed -i '' "s/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g" {} +
+          find . -name "project.pbxproj" -exec sed -i '' "s/DEVELOPMENT_TEAM = [A-Z0-9]*;/DEVELOPMENT_TEAM = $TEAM_ID;/g" {} +
+
+          # 2. LIMPEZA DE CACHE
+          echo "🧹 Limpando DerivedData..."
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           rm -rf build/ios
 
-          # 2. SANEAMENTO AGRESSIVO (Ajustando o caminho para garantir que pegue tudo)
-          echo "🛠️ Corrigindo referências de certificados nos arquivos do projeto..."
-          find . -name "*.pbxproj" -exec sed -i '' "s/iOS Distribution/Apple Distribution/g" {} +
-          find . -name "*.pbxproj" -exec sed -i '' "s/iPhone Distribution/Apple Distribution/g" {} +
-          find . -name "*.pbxproj" -exec sed -i '' "s/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g" {} +
-
-          # 3. VERIFICAÇÃO (Isso aparecerá no seu log do Codemagic)
-          echo "🔍 Verificando se o nome 'iOS Distribution' ainda existe no projeto:"
+          # 3. VERIFICAÇÃO DE SEGURANÇA (Vai aparecer no seu log)
+          echo "🔍 O termo 'iOS Distribution' ainda existe?"
           grep -r "iOS Distribution" . || echo "✅ Sucesso: Nenhuma menção ao nome antigo encontrada!"
 
           # 4. EXECUTAR O ARCHIVE
-          # Adicionado -allowProvisioningOffline=YES para evitar buscas automáticas que falham
+          # Adicionado -allowProvisioningOffline=YES para garantir uso exclusivo do perfil manual
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
