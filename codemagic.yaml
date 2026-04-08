@@ -28,6 +28,7 @@ workflows:
 
       - name: Create Export Options
         script: |
+          # Ajuste no method e adição do signingCertificate para evitar erro 70
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -57,11 +58,11 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🛠️ Aplicando normalização de identidades..."
+          echo "🛠️ Preparando ambiente e limpando referências..."
           
           chmod +x gradlew
           
-          # Limpeza de identidades no projeto para evitar conflito com o Archive
+          # Limpeza de identidades no projeto para não confundir o exportador
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "";/g' {} +
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = ".*";/CODE_SIGN_IDENTITY[sdk=iphoneos*] = "";/g' {} +
 
@@ -82,11 +83,12 @@ workflows:
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGN_IDENTITY="" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             -allowProvisioningOffline=YES | tee build/ios/logs/xcodebuild_raw_log.txt
 
           echo "📦 Gerando arquivo IPA final..."
+          # Forçamos a identidade Apple Distribution aqui para casar com o que o Xcode 16+ espera
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
