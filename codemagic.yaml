@@ -65,16 +65,23 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          # SANEAMENTO AGRESSIVO: Remove qualquer rastro de "iOS Distribution" ou "iPhone Distribution"
-          # Isso corrige o erro onde o Xcode ignora o override do terminal
-          find iosApp -type f -exec sed -i '' "s/iOS Distribution/Apple Distribution/g" {} +
-          find iosApp -type f -exec sed -i '' "s/iPhone Distribution/Apple Distribution/g" {} +
-          
-          # Força o Estilo de Assinatura Manual e o Team ID no arquivo do projeto
-          sed -i '' "s/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g" "$XCODE_PROJECT/project.pbxproj"
-          sed -i '' "s/DEVELOPMENT_TEAM = .*;/DEVELOPMENT_TEAM = $TEAM_ID;/g" "$XCODE_PROJECT/project.pbxproj"
+          # 1. LIMPEZA DE CACHE DO XCODE (Onde o erro costuma se esconder)
+          echo "🧹 Limpando DerivedData e caches para garantir build limpo..."
+          rm -rf ~/Library/Developer/Xcode/DerivedData/*
+          rm -rf build/ios
 
-          # O comando archive agora usa explicitamente a identidade correta e o UUID do perfil
+          # 2. SANEAMENTO AGRESSIVO (Ajustando o caminho para garantir que pegue tudo)
+          echo "🛠️ Corrigindo referências de certificados nos arquivos do projeto..."
+          find . -name "*.pbxproj" -exec sed -i '' "s/iOS Distribution/Apple Distribution/g" {} +
+          find . -name "*.pbxproj" -exec sed -i '' "s/iPhone Distribution/Apple Distribution/g" {} +
+          find . -name "*.pbxproj" -exec sed -i '' "s/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g" {} +
+
+          # 3. VERIFICAÇÃO (Isso aparecerá no seu log do Codemagic)
+          echo "🔍 Verificando se o nome 'iOS Distribution' ainda existe no projeto:"
+          grep -r "iOS Distribution" . || echo "✅ Sucesso: Nenhuma menção ao nome antigo encontrada!"
+
+          # 4. EXECUTAR O ARCHIVE
+          # Adicionado -allowProvisioningOffline=YES para evitar buscas automáticas que falham
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -86,9 +93,10 @@ workflows:
             CODE_SIGN_STYLE="Manual" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            -allowProvisioningOffline=YES
 
-          # Exporta o IPA final da Pax Rio Verde
+          # 5. EXPORTAR IPA
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
