@@ -27,14 +27,6 @@ workflows:
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
           echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
-          
-          # 3. LIMPEZA TOTAL: PBXPROJ + XCCONFIG + PLIST
-          # Altera em todos os arquivos do projeto para garantir que o nome antigo não persista
-          find . -type f \( -name "*.pbxproj" -o -name "*.xcconfig" -o -name "*.plist" \) -exec sed -i '' "s/iOS Distribution/Apple Distribution/g" {} +
-          find . -type f \( -name "*.pbxproj" -o -name "*.xcconfig" -o -name "*.plist" \) -exec sed -i '' "s/iPhone Distribution/Apple Distribution/g" {} +
-          find . -name "*.pbxproj" -exec sed -i '' "s/ProvisioningStyle = Automatic;/ProvisioningStyle = Manual;/g" {} +
-          
-          echo "Projeto Xcode saneado totalmente para Apple Distribution."
 
       - name: Create Export Options
         script: |
@@ -50,7 +42,7 @@ workflows:
               <key>provisioningProfiles</key>
               <dict>
                   <key>$APP_ID</key>
-                  <string>$PROV_NAME</string>
+                  <string>$PROV_UUID</string>
               </dict>
               <key>signingStyle</key>
               <string>manual</string>
@@ -62,18 +54,25 @@ workflows:
 
       - name: Build and Sign IPA
         script: |
-          # 1. LIMPEZA E PREPARAÇÃO
-          echo "🧹 Limpando configurações de assinatura e caches..."
+          #!/usr/bin/env bash
+          
+          # 1. SANEAMENTO RADICAL (Remove qualquer trava de identidade antiga no código)
+          echo "🛠️ Limpando referências fixas no projeto..."
+          find . -type f \( -name "*.pbxproj" -o -name "*.xcconfig" -o -name "*.plist" \) -exec sed -i '' "s/iOS Distribution/Apple Distribution/g" {} +
+          find . -type f \( -name "*.pbxproj" -o -name "*.xcconfig" -o -name "*.plist" \) -exec sed -i '' "s/iPhone Distribution/Apple Distribution/g" {} +
+          
+          # Deleta as linhas de CODE_SIGN_IDENTITY para o Xcode não tentar sobrescrever o nosso comando
           find . -name "project.pbxproj" -exec sed -i '' '/CODE_SIGN_IDENTITY/d' {} +
           find . -name "project.pbxproj" -exec sed -i '' '/PROVISIONING_PROFILE/d' {} +
           find . -name "project.pbxproj" -exec sed -i '' "s/ProvisioningStyle = [a-zA-Z]*;/ProvisioningStyle = Manual;/g" {} +
 
+          # 2. LIMPEZA DE CACHE
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          # 2. ARCHIVE (Com sintaxe simplificada para evitar erros de shell)
-          # Aqui forçamos a identidade "Apple Distribution" de forma limpa
+          # 3. ARCHIVE
+          # Usamos PROVISIONING_PROFILE_SPECIFIER com o UUID para não ter erro
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -88,7 +87,7 @@ workflows:
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             -allowProvisioningOffline=YES
 
-          # 3. EXPORTAR IPA
+          # 4. EXPORTAR IPA
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
