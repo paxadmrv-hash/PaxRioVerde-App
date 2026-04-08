@@ -22,20 +22,23 @@ workflows:
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
+          # Listar identidades para depuração (aparecerá no log)
+          security find-identity -v -p codesigning
+          
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
           echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
 
       - name: Create Export Options
         script: |
-          # Criando o arquivo de exportação forçando o certificado "Apple Distribution"
+          # Criando o arquivo de exportação com o método atualizado e certificado explícito
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>app-store</string>
+              <string>app-store-connect</string>
               <key>teamID</key>
               <string>$TEAM_ID</string>
               <key>provisioningProfiles</key>
@@ -58,10 +61,10 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🛠️ Limpando caches e configurando build..."
+          echo "🛠️ Limpando referências e forçando Apple Distribution..."
           chmod +x gradlew
           
-          # Remove referências antigas no projeto que causam o erro de "iOS Distribution"
+          # Remove QUALQUER menção a identidades específicas para não confundir o exportador
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "";/g' {} +
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = ".*";/CODE_SIGN_IDENTITY[sdk=iphoneos*] = "";/g' {} +
 
@@ -72,7 +75,6 @@ workflows:
           mkdir -p build/ios/logs
 
           echo "🚀 Executando xcodebuild archive..."
-          # Deixamos a identidade vazia aqui para ele usar o match do Team ID que funcionou no seu log
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -88,7 +90,7 @@ workflows:
             -allowProvisioningOffline=YES | tee build/ios/logs/xcodebuild_raw_log.txt
 
           echo "📦 Gerando arquivo IPA final..."
-          # Aqui forçamos o nome moderno "Apple Distribution" para matar o erro 70
+          # O segredo está em passar a identidade exata aqui para sobrescrever o erro do Xcode
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
