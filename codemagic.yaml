@@ -55,48 +55,45 @@ workflows:
       - name: Build and Sign IPA
         script: |
           #!/usr/bin/env bash
+          # Garante que a falha do xcodebuild não seja ocultada pelo comando 'tee'
+          set -e -o pipefail
           
-          echo "🧹 Iniciando limpeza profunda no arquivo do projeto..."
+          echo "🛠️ Preparando build com captura de log detalhado..."
           
-          # 1. DELEÇÃO AGRESSIVA DE CONFIGURAÇÕES
-          # Removemos qualquer linha que defina a identidade ou o perfil no .pbxproj
-          # Isso obriga o Xcode a usar os parâmetros que enviaremos no comando
-          find . -type f -name "project.pbxproj" -exec sed -i '' '/CODE_SIGN_IDENTITY/d' {} +
-          find . -type f -name "project.pbxproj" -exec sed -i '' '/PROVISIONING_PROFILE/d' {} +
-          find . -type f -name "project.pbxproj" -exec sed -i '' '/CODE_SIGN_STYLE/d' {} +
-          
-          # Força o Provisioning Style como Manual em tudo
-          find . -name "project.pbxproj" -exec sed -i '' "s/ProvisioningStyle = [a-zA-Z]*;/ProvisioningStyle = Manual;/g" {} +
+          # 1. SUBSTITUIÇÃO GLOBAL NO CÓDIGO
+          find . -type f \( -name "*.pbxproj" -o -name "*.plist" -o -name "*.xcconfig" \) -exec sed -i '' 's/iOS Distribution/Apple Distribution/g' {} +
+          find . -type f \( -name "*.pbxproj" -o -name "*.plist" -o -name "*.xcconfig" \) -exec sed -i '' 's/iPhone Distribution/Apple Distribution/g' {} +
 
-          # 2. INJEÇÃO VIA VARIÁVEIS DE AMBIENTE (Global Override)
-          # Isso garante que o script 'Compile Kotlin Framework' herde a assinatura
-          export CODE_SIGNING_REQUIRED=YES
+          # 2. FORÇAR VARIÁVEIS NO AMBIENTE DO KOTLIN/GRADLE
           export CODE_SIGN_IDENTITY="Apple Distribution"
           export PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID"
           export DEVELOPMENT_TEAM="$TEAM_ID"
 
-          # 3. LIMPEZA DE CACHE DO XCODE
+          # 3. LIMPEZA DE CACHE E PREPARAÇÃO DA PASTA DE LOGS
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
+          mkdir -p build/ios/logs
 
-          # 4. ARCHIVE
-          # Usamos o sinalizador -allowProvisioningOffline para evitar que o Xcode tente validar via rede
+          # 4. ARCHIVE COM OVERRIDE TOTAL E CAPTURA DE LOG
+          echo "🚀 Executando xcodebuild..."
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -destination 'generic/platform=iOS' \
+            -resultBundlePath build/ios/logs/PaxBuildLogs.xcresult \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             -allowProvisioningOffline=YES \
-            -allowProvisioningUpdates=NO
+            COMPILER_INDEX_STORE_ENABLE=NO | tee build/ios/logs/xcodebuild_raw_log.txt
 
           # 5. EXPORTAR IPA
+          echo "📦 Gerando IPA final..."
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
@@ -104,3 +101,5 @@ workflows:
 
     artifacts:
       - build/ios/ipa/*.ipa
+      - build/ios/logs/xcodebuild_raw_log.txt
+      - build/ios/logs/PaxBuildLogs.xcresult.zip
