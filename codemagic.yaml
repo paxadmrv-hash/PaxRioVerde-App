@@ -56,14 +56,17 @@ workflows:
         script: |
           #!/usr/bin/env bash
           
-          # 1. FORÇAR A TROCA DENTRO DOS ARQUIVOS DO PROJETO
-          # Isso resolve o problema onde o Xcode ignora o comando do terminal
-          echo "🛠️ Corrigindo nomes de certificados dentro dos arquivos do projeto..."
-          find . -type f -name "*.pbxproj" -exec sed -i '' 's/iOS Distribution/Apple Distribution/g' {} +
-          find . -type f -name "*.pbxproj" -exec sed -i '' 's/iPhone Distribution/Apple Distribution/g' {} +
+          # 1. LIMPEZA RADICAL: Remove qualquer menção a nomes de certificados antigos
+          # Deletamos as linhas de CODE_SIGN_IDENTITY para que o Xcode não tenha onde buscar "iOS Distribution"
+          echo "🛠️ Limpando travas de assinatura nos arquivos do projeto..."
+          find . -name "project.pbxproj" -exec sed -i '' '/CODE_SIGN_IDENTITY/d' {} +
+          find . -name "project.pbxproj" -exec sed -i '' '/PROVISIONING_PROFILE/d' {} +
+          
+          # Força o estilo manual em todas as configurações
+          find . -name "project.pbxproj" -exec sed -i '' "s/ProvisioningStyle = [a-zA-Z]*;/ProvisioningStyle = Manual;/g" {} +
 
           # 2. CRIAR O ARQUIVO DE OVERRIDE MESTRE (.xcconfig)
-          echo "📝 Criando configuração mestre..."
+          echo "📝 Criando configuração mestre de assinatura..."
           cat > /Users/builder/force_signing.xcconfig <<EOF
           CODE_SIGN_IDENTITY = Apple Distribution
           CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution
