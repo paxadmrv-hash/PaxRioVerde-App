@@ -61,48 +61,33 @@ workflows:
           
           echo "🛠️ Iniciando Saneamento Radical para a Pax Rio Verde..."
           
-          # 1. FORÇAR SUBSTITUIÇÃO E LIMPEZA (No .pbxproj)
-          # Substituímos qualquer menção a nomes legados por 'Apple Distribution'
+          # 1. FORÇAR SUBSTITUIÇÃO DE TEXTO (Geral)
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/iOS Distribution/Apple Distribution/g' {} +
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/iPhone Distribution/Apple Distribution/g' {} +
           
-          # Deletamos as linhas que "travam" identidades antigas no arquivo do projeto
+          # 2. DELETAR DEFINIÇÕES CONFLITANTES
+          # Removemos as linhas que "travam" a identidade e o perfil no projeto
           find . -type f -name "project.pbxproj" -exec sed -i '' '/CODE_SIGN_IDENTITY/d' {} +
           find . -type f -name "project.pbxproj" -exec sed -i '' '/PROVISIONING_PROFILE/d' {} +
           
-          # Força o estilo de provisionamento Manual em todas as configurações
-          find . -name "project.pbxproj" -exec sed -i '' "s/ProvisioningStyle = [a-zA-Z]*;/ProvisioningStyle = Manual;/g" {} +
-
-          # 2. CRIAR XC_CONFIG DE EMERGÊNCIA
-          # Isso sobrescreve qualquer configuração que tenha sobrado no Xcode
-          cat > /Users/builder/release.xcconfig <<EOF
-          CODE_SIGN_IDENTITY = Apple Distribution
-          CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution
-          DEVELOPMENT_TEAM = $TEAM_ID
-          PROVISIONING_PROFILE_SPECIFIER = $PROV_UUID
-          CODE_SIGN_STYLE = Manual
-          EOF
-
           # 3. FORÇAR VARIÁVEIS DE AMBIENTE GLOBAIS
-          # Isso garante que até os scripts internos do Kotlin (embedAndSign) vejam a assinatura correta
+          # Isso garante que até os scripts internos do Kotlin vejam a assinatura correta
           export CODE_SIGN_IDENTITY="Apple Distribution"
           export PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID"
           export DEVELOPMENT_TEAM="$TEAM_ID"
-          export CODE_SIGN_STYLE="Manual"
 
           # 4. LIMPEZA DE CACHE
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          # 5. ARCHIVE (Injetando tudo via xcconfig e parâmetros de linha de comando)
+          # 5. ARCHIVE (Injetando tudo via linha de comando para não dar margem ao erro)
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -destination 'generic/platform=iOS' \
-            -xcconfig /Users/builder/release.xcconfig \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
