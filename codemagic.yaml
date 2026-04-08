@@ -19,11 +19,9 @@ workflows:
 
       - name: Install Credentials
         script: |
-          # 1. Instala o Certificado P12
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # 2. Instala o Perfil de Provisionamento
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
           echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
@@ -57,14 +55,15 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🛠️ Corrigindo permissões e aplicando patch de assinatura..."
+          echo "🛠️ Aplicando Override técnico por Team ID..."
           
-          # 1. CORREÇÃO DE PERMISSÃO (Agora sem erro de digitação)
+          # 1. PERMISSÕES
           chmod +x gradlew
           
-          # 2. SUBSTITUIÇÃO PARA IDENTIDADE GENÉRICA
-          find . -type f -name "project.pbxproj" -exec sed -i '' 's/iOS Distribution/iPhone Distribution/g' {} +
-          find . -type f -name "project.pbxproj" -exec sed -i '' 's/Apple Distribution/iPhone Distribution/g' {} +
+          # 2. LIMPEZA RADICAL DO PROJETO
+          # Removemos qualquer valor de CODE_SIGN_IDENTITY para o Xcode usar o padrão do sistema
+          find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "";/g' {} +
+          find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = ".*";/CODE_SIGN_IDENTITY[sdk=iphoneos*] = "";/g' {} +
 
           # 3. LIMPEZA E PREPARAÇÃO
           ./gradlew clean
@@ -73,7 +72,8 @@ workflows:
           mkdir -p build/ios/ipa
           mkdir -p build/ios/logs
 
-          # 4. ARCHIVE COM OVERRIDE
+          # 4. ARCHIVE USANDO APENAS O TEAM ID E O PROVISIONING PROFILE
+          # Note que deixamos CODE_SIGN_IDENTITY vazio no comando para ele buscar o melhor match pelo TEAM_ID
           echo "🚀 Executando xcodebuild archive..."
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
@@ -82,13 +82,12 @@ workflows:
             -archivePath build/ios/xcarchive/app.xcarchive \
             -destination 'generic/platform=iOS' \
             -resultBundlePath build/ios/logs/PaxBuildLogs.xcresult \
-            CODE_SIGN_IDENTITY="iPhone Distribution" \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
+            CODE_SIGN_IDENTITY="" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
-            -allowProvisioningOffline=YES \
-            COMPILER_INDEX_STORE_ENABLE=NO | tee build/ios/logs/xcodebuild_raw_log.txt
+            -allowProvisioningOffline=YES | tee build/ios/logs/xcodebuild_raw_log.txt
 
           # 5. EXPORTAR IPA
           echo "📦 Gerando arquivo IPA final..."
