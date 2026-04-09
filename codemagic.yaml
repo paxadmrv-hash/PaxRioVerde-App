@@ -18,12 +18,14 @@ workflows:
 
       - name: Fetch Signing Files (App Store Connect)
         script: |
-          # Adicionamos a flag --create e garantimos que ele gere um novo 
-          # caso não encontre a chave privada localmente.
+          # O comando fetch-signing-files baixa os perfis e certificados da Apple.
+          # A flag --create tenta gerar um novo certificado se a chave privada estiver faltando.
           app-store-connect fetch-signing-files "$APP_ID" \
             --type IOS_APP_STORE \
-            --create \
-            --install-certificates
+            --create
+          
+          # Este é o comando que realmente instala os certificados baixados no chaveiro do macOS
+          keychain add-certificates
 
       - name: Set up code signing settings on Xcode project
         script: xcode-project use-profiles
@@ -33,7 +35,7 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
 
-          echo "🧹 Limpando ambiente..."
+          echo "🧹 Limpando ambiente e compilando..."
           chmod +x gradlew
           ./gradlew clean
           
@@ -41,7 +43,6 @@ workflows:
           mkdir -p build/ios/ipa
 
           echo "🚀 Gerando IPA da Pax Rio Verde..."
-          # O comando build-ipa gerencia a assinatura final de forma mais segura
           xcode-project build-ipa \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
