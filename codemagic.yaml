@@ -22,7 +22,7 @@ workflows:
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
-          # 🔍 Detecta o nome real exato (Apple Distribution ou iOS Distribution)
+          # Detecta o nome para usar APENAS no Archive
           CERT_NAME=$(security find-identity -v -p codesigning | grep "Distribution" | head -1 | grep -o '".*"' | sed 's/"//g')
           echo "CERT_NAME=$CERT_NAME" >> $CM_ENV
           echo "✅ Certificado detectado: $CERT_NAME"
@@ -34,7 +34,7 @@ workflows:
 
       - name: Create Export Options
         script: |
-          echo "🛠 Criando export_options.plist..."
+          echo "🛠 Criando export_options.plist (SEM a chave signingCertificate)..."
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -46,15 +46,13 @@ workflows:
               <string>$TEAM_ID</string>
               <key>signingStyle</key>
               <string>manual</string>
-              <key>signingCertificate</key>
-              <string>$CERT_NAME</string>
               <key>provisioningProfiles</key>
               <dict>
                   <key>$APP_ID</key>
                   <string>$PROV_UUID</string>
               </dict>
               <key>manageAppVersionAndBuildNumber</key>
-              <true/>
+              <false/>
           </dict>
           </plist>
           EOF
@@ -68,13 +66,13 @@ workflows:
           chmod +x gradlew
           ./gradlew clean
           
-          # Garante que o projeto aceite a assinatura manual no CI
           sed -i '' 's/CODE_SIGN_STYLE = .*/CODE_SIGN_STYLE = Manual;/g' "$XCODE_PROJECT/project.pbxproj"
 
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
           echo "🚀 Gerando Archive..."
+          # Aqui mantemos as informações explícitas porque o Archive precisa delas para compilar
           xcodebuild archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -84,16 +82,14 @@ workflows:
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             CODE_SIGN_IDENTITY="$CERT_NAME" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
-            -allowProvisioningOffline=YES
+            PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID"
 
           echo "📦 Exportando IPA..."
-          # Removido o CODE_SIGN_IDENTITY do comando para forçar o xcodebuild a ler do export_options.plist
+          # O exportArchive agora vai se basear puramente no Plist enxuto e no Archive recém-criado
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
-            -exportOptionsPlist "/Users/builder/export_options.plist" \
-            -allowProvisioningOffline=YES
+            -exportOptionsPlist "/Users/builder/export_options.plist"
 
     artifacts:
       - build/ios/ipa/*.ipa
