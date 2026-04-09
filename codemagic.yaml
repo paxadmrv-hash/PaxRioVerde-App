@@ -3,29 +3,33 @@ workflows:
     name: Pax Rio Verde iOS Final Build
     instance_type: mac_mini_m2
     max_build_duration: 60
-
     environment:
       groups:
         - "Pax Rio Verde"
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
+        APP_ID: "br.com.paxrioverde.app"
         TEAM_ID: "264TWUW2L6"
-
+        PROV_UUID: "f83a914d-202a-436e-9e51-257ae86fccd0"
     scripts:
       - name: Initialize Keychain
         script: keychain initialize
 
-      - name: Install Certificate
+      - name: Install Credentials
         script: |
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
-
-          keychain add-certificates \
-            --certificate /tmp/certificate.p12 \
-            --certificate-password "$CERTIFICATE_PASSWORD"
-
-          echo "🔍 Certificados disponíveis:"
-          security find-identity -v -p codesigning
+          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
+          
+          # Detecta o nome do certificado
+          CERT_NAME=$(security find-identity -v -p codesigning | grep "Distribution" | head -1 | grep -o '".*"' | sed 's/"//g')
+          echo "CERT_NAME=$CERT_NAME" >> $CM_ENV
+          
+          # Instala o Provisioning Profile no local padrão do Xcode
+          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILES_DIR"
+          echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
+          echo "✅ Profile instalado em: $PROFILES_DIR/$PROV_UUID.mobileprovision"
 
       - name: Create Export Options
         script: |
@@ -36,19 +40,17 @@ workflows:
           <dict>
               <key>method</key>
               <string>app-store-connect</string>
-
               <key>teamID</key>
               <string>$TEAM_ID</string>
-
               <key>signingStyle</key>
-              <string>automatic</string>
-
-              <key>stripSwiftSymbols</key>
-              <true/>
-
-              <key>compileBitcode</key>
-              <false/>
-
+              <string>manual</string>
+              <key>signingCertificate</key>
+              <string>$CERT_NAME</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>$APP_ID</key>
+                  <string>$PROV_UUID</string>
+              </dict>
               <key>manageAppVersionAndBuildNumber</key>
               <true/>
           </dict>
@@ -59,43 +61,35 @@ workflows:
         script: |
           #!/usr/bin/env bash
           set -e -o pipefail
-
-          echo "🧹 Limpando ambiente..."
+          
+          echo "🧹 Limpando configurações manuais antigas..."
+          sed -i '' 's/CODE_SIGN_STYLE = .*/CODE_SIGN_STYLE = Manual;/g' "$XCODE_PROJECT/project.pbxproj"
+          
           chmod +x gradlew
           ./gradlew clean
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
+          
+          mkdir -p build/ios/xcarchive
+          mkdir -p build/ios/ipa
 
-          echo "🧹 Limpando COMPLETAMENTE o signing do projeto..."
-
-          # Remove qualquer configuração manual de provisioning
-          sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = .*/PROVISIONING_PROFILE_SPECIFIER = "";/g' "$XCODE_PROJECT/project.pbxproj"
-          sed -i '' 's/PROVISIONING_PROFILE = .*/PROVISIONING_PROFILE = "";/g' "$XCODE_PROJECT/project.pbxproj"
-
-          # Remove QUALQUER identidade de assinatura
-          sed -i '' 's/CODE_SIGN_IDENTITY = .*/CODE_SIGN_IDENTITY = "";/g' "$XCODE_PROJECT/project.pbxproj"
-
-          # Força assinatura automática
-          sed -i '' 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' "$XCODE_PROJECT/project.pbxproj"
-
-          echo "🚀 Iniciando Archive..."
-
+          echo "🚀 Gerando Archive..."
           xcodebuild archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -destination 'generic/platform=iOS' \
+            CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_STYLE="Automatic" \
-            -allowProvisioningUpdates
+            CODE_SIGN_IDENTITY="$CERT_NAME" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
+            -allowProvisioningOffline=YES
 
           echo "📦 Exportando IPA..."
-
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
             -exportOptionsPlist "/Users/builder/export_options.plist"
-
     artifacts:
       - build/ios/ipa/*.ipa
       - build/ios/xcarchive/*.xcarchive
