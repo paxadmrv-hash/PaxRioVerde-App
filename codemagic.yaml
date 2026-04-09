@@ -3,6 +3,7 @@ workflows:
     name: Pax Rio Verde iOS Final Build
     instance_type: mac_mini_m2
     max_build_duration: 60
+
     environment:
       groups:
         - "Pax Rio Verde"
@@ -12,20 +13,28 @@ workflows:
         APP_ID: "br.com.paxrioverde.app"
         TEAM_ID: "264TWUW2L6"
         PROV_UUID: "f83a914d-202a-436e-9e51-257ae86fccd0"
+
     scripts:
       - name: Initialize Keychain
         script: keychain initialize
 
-      - name: Install Credentials
+      - name: Install Certificates & Profiles
         script: |
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
-          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
-          
-          CERT_NAME=$(security find-identity -v -p codesigning | grep "Distribution" | head -1 | grep -o '".*"' | sed 's/"//g')
-          echo "CERT_NAME=$CERT_NAME" >> $CM_ENV
-          
+
+          keychain add-certificates \
+            --certificate /tmp/certificate.p12 \
+            --certificate-password "$CERTIFICATE_PASSWORD"
+
+          echo "🔍 Certificados disponíveis:"
+          security find-identity -v -p codesigning
+
+          # Forçando padrão novo da Apple
+          echo "CERT_NAME=Apple Distribution" >> $CM_ENV
+
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
+
           echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
 
       - name: Create Export Options
@@ -36,18 +45,14 @@ workflows:
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>app-store</string>
+              <string>app-store-connect</string>
+
               <key>teamID</key>
               <string>$TEAM_ID</string>
+
               <key>signingStyle</key>
-              <string>manual</string>
-              <key>signingCertificate</key>
-              <string>$CERT_NAME</string>
-              <key>provisioningProfiles</key>
-              <dict>
-                  <key>$APP_ID</key>
-                  <string>$PROV_UUID</string>
-              </dict>
+              <string>automatic</string>
+
               <key>manageAppVersionAndBuildNumber</key>
               <true/>
           </dict>
@@ -58,15 +63,12 @@ workflows:
         script: |
           #!/usr/bin/env bash
           set -e -o pipefail
-          
-          # Limpeza profunda
-          sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "";/g' "$XCODE_PROJECT/project.pbxproj"
-          sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = ".*";/PROVISIONING_PROFILE_SPECIFIER = "";/g' "$XCODE_PROJECT/project.pbxproj"
-          
+
+          echo "🧹 Limpando projeto..."
           chmod +x gradlew
           ./gradlew clean
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
-          
+
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
@@ -77,20 +79,16 @@ workflows:
             -configuration Release \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -destination 'generic/platform=iOS' \
-            CODE_SIGN_STYLE="Manual" \
+            CODE_SIGN_STYLE="Automatic" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_IDENTITY="$CERT_NAME" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
-            -allowProvisioningOffline=YES
+            -allowProvisioningUpdates
 
           echo "📦 Exportando IPA..."
-          # O segredo está aqui: o exportPath precisa ser onde o artefato vai buscar
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
             -exportOptionsPlist "/Users/builder/export_options.plist"
 
     artifacts:
-      # Usamos o padrão recursivo (**) para garantir que ele ache o .ipa em qualquer subpasta de build
       - build/ios/ipa/*.ipa
       - build/ios/xcarchive/*.xcarchive
