@@ -44,6 +44,7 @@ workflows:
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
+
               <key>method</key>
               <string>app-store-connect</string>
 
@@ -53,6 +54,7 @@ workflows:
               <key>signingStyle</key>
               <string>manual</string>
 
+              <!-- 🔥 CORREÇÃO PRINCIPAL -->
               <key>signingCertificate</key>
               <string>Apple Distribution</string>
 
@@ -70,6 +72,7 @@ workflows:
 
               <key>manageAppVersionAndBuildNumber</key>
               <true/>
+
           </dict>
           </plist>
           EOF
