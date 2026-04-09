@@ -5,7 +5,7 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - "Pax Rio Verde" # Nome exato do grupo que aparece na sua imagem
+        - "Pax Rio Verde"
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
@@ -21,10 +21,6 @@ workflows:
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # Detecta automaticamente o nome do certificado instalado
-          CERT_NAME=$(security find-identity -v -p codesigning | grep "Distribution" | head -1 | grep -o '".*"' | sed 's/"//g')
-          echo "CERT_NAME=$CERT_NAME" >> $CM_ENV
-          
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
           echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
@@ -37,13 +33,13 @@ workflows:
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>app-store</string>
+              <string>app-store-connect</string>
               <key>teamID</key>
               <string>$TEAM_ID</string>
               <key>signingStyle</key>
               <string>manual</string>
               <key>signingCertificate</key>
-              <string>$CERT_NAME</string>
+              <string>Apple Distribution</string>
               <key>provisioningProfiles</key>
               <dict>
                   <key>$APP_ID</key>
@@ -60,10 +56,14 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          # Limpeza de identidades para forçar o uso das novas
+          echo "🧹 Limpando configurações de assinatura..."
           sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "";/g' "$XCODE_PROJECT/project.pbxproj"
           sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = ".*";/PROVISIONING_PROFILE_SPECIFIER = "";/g' "$XCODE_PROJECT/project.pbxproj"
+          sed -i '' 's/PROVISIONING_PROFILE = ".*";/PROVISIONING_PROFILE = "";/g' "$XCODE_PROJECT/project.pbxproj"
           
+          find . -name "*.xcconfig" -exec sed -i '' 's/CODE_SIGN_IDENTITY = .*/CODE_SIGN_IDENTITY = /g' {} +
+          find . -name "*.xcconfig" -exec sed -i '' 's/PROVISIONING_PROFILE = .*/PROVISIONING_PROFILE = /g' {} +
+
           chmod +x gradlew
           ./gradlew clean
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
@@ -71,7 +71,7 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          echo "🚀 Iniciando Archive..."
+          echo "🚀 Gerando Archive..."
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -80,7 +80,7 @@ workflows:
             -destination 'generic/platform=iOS' \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_IDENTITY="$CERT_NAME" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
             -allowProvisioningOffline=YES
 
@@ -88,10 +88,8 @@ workflows:
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
-            -exportOptionsPlist "/Users/builder/export_options.plist" \
-            CODE_SIGN_IDENTITY="$CERT_NAME"
+            -exportOptionsPlist "/Users/builder/export_options.plist"
 
     artifacts:
-      # Esta seção garante que o link de download apareça no painel do Codemagic
       - build/ios/ipa/*.ipa
       - build/ios/xcarchive/app.xcarchive
