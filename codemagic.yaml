@@ -5,7 +5,7 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - "Pax Rio Verde" # Certifique-se de que APP_ID e TEAM_ID estão aqui
+        - "Pax Rio Verde"
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
@@ -18,13 +18,13 @@ workflows:
 
       - name: Fetch Signing Files (App Store Connect)
         script: |
-          # Este comando substitui toda aquela instalação manual de P12.
-          # Ele baixa o certificado e o Profile direto da Apple usando a API que você configurou.
+          # O segredo está na flag --create
+          # Ela gera um novo certificado e a chave privada necessária automaticamente
           app-store-connect fetch-signing-files "$APP_ID" \
             --type IOS_APP_STORE \
             --create
           
-          # Importa os certificados baixados para o keychain do Codemagic
+          # Agora o comando terá o que instalar
           keychain add-certificates
 
       - name: Set up code signing settings on Xcode project
@@ -43,8 +43,7 @@ workflows:
           mkdir -p build/ios/ipa
 
           echo "🚀 Gerando Archive e Exportando IPA..."
-          # O comando 'build-ipa' do Codemagic é um wrapper que resolve 
-          # automaticamente os problemas de export_options e identidades.
+          # Usando o comando unificado que evita conflitos de nomes
           xcode-project build-ipa \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
