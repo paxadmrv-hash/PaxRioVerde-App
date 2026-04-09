@@ -16,18 +16,17 @@ workflows:
       - name: Initialize Keychain
         script: |
           keychain initialize
-          # Remove qualquer resquício de certificados antigos da máquina de build
-          keychain set-default
+          # Corrigido para o comando oficial:
+          keychain make-default
 
       - name: Fetch Signing Files (App Store Connect)
         script: |
-          # O comando abaixo agora força a criação e ignora certificados sem chave privada
+          # Usando flags para garantir a criação da chave privada interna
           app-store-connect fetch-signing-files "$APP_ID" \
             --type IOS_APP_STORE \
-            --create \
-            --generate-content
+            --create
           
-          # Instala o que foi gerado agora
+          # Força a instalação dos certificados recém-gerados
           keychain add-certificates
 
       - name: Set up code signing settings on Xcode project
@@ -45,8 +44,7 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          echo "🚀 Gerando IPA..."
-          # Usando o comando de build que força o uso do perfil baixado
+          echo "🚀 Gerando IPA da Pax Rio Verde..."
           xcode-project build-ipa \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
