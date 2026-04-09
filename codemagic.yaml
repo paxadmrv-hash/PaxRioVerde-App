@@ -25,20 +25,8 @@ workflows:
           mkdir -p "$PROFILES_DIR"
           echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
 
-      - name: Create Force Settings
+      - name: Create Export Options
         script: |
-          # Criamos um arquivo de configuração que tem a última palavra sobre o build
-          cat > /tmp/force_signing.xcconfig <<EOF
-          CODE_SIGN_STYLE = Manual
-          CODE_SIGN_IDENTITY = Apple Distribution
-          CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution
-          DEVELOPMENT_TEAM = $TEAM_ID
-          PROVISIONING_PROFILE = $PROV_UUID
-          PROVISIONING_PROFILE_SPECIFIER = $PROV_UUID
-          AD_HOC_CODE_SIGNING_ALLOWED = NO
-          EOF
-          
-          # Criamos o export_options atualizado
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -68,31 +56,44 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🧹 Limpando DerivedData e caches..."
-          rm -rf ~/Library/Developer/Xcode/DerivedData/*
+          echo "🛠️ Limpando identidades fixas do arquivo .xcodeproj..."
+          
+          # Remove QUALQUER nome de certificado fixo, forçando o Xcode a usar o que estiver no perfil
+          sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "Apple Distribution";/g' "$XCODE_PROJECT/project.pbxproj"
+          sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = ".*";/CODE_SIGN_IDENTITY[sdk=iphoneos*] = "Apple Distribution";/g' "$XCODE_PROJECT/project.pbxproj"
+          
+          # Remove menções ao nome antigo especificamente
+          sed -i '' 's/iOS Distribution/Apple Distribution/g' "$XCODE_PROJECT/project.pbxproj"
+          
+          # Garante que o Provisioning Profile no arquivo seja o correto
+          sed -i '' "s/PROVISIONING_PROFILE = \".*\";/PROVISIONING_PROFILE = \"$PROV_UUID\";/g" "$XCODE_PROJECT/project.pbxproj"
+          sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = \".*\";/PROVISIONING_PROFILE_SPECIFIER = \"$PROV_UUID\";/g" "$XCODE_PROJECT/project.pbxproj"
+
           chmod +x gradlew
           ./gradlew clean
-
+          rm -rf ~/Library/Developer/Xcode/DerivedData/*
+          
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          echo "🚀 Executando Archive com Force Config..."
-          # Usamos o flag -xcconfig para forçar as nossas regras sobre o projeto
-          xcodebuild archive \
+          echo "🚀 Executando Archive..."
+          xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -destination 'generic/platform=iOS' \
-            -xcconfig /tmp/force_signing.xcconfig \
+            CODE_SIGN_STYLE="Manual" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE="$PROV_UUID" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
             -allowProvisioningOffline=YES
 
           echo "📦 Exportando IPA..."
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
-            -exportOptionsPlist "/Users/builder/export_options.plist" \
-            -xcconfig /tmp/force_signing.xcconfig
-
+            -exportOptionsPlist "/Users/builder/export_options.plist"
     artifacts:
       - build/ios/ipa/*.ipa
