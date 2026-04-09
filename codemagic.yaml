@@ -21,9 +21,8 @@ workflows:
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # Detecta o nome real do certificado (ex: "Apple Distribution: PAX RIO VERDE...")
-          CERT_NAME=$(security find-identity -v -p codesigning | grep "Distribution" | head -1 | grep -o '".*"' | sed 's/"//g')
-          echo "CERT_NAME=$CERT_NAME" >> $CM_ENV
+          # Garante que usaremos o nome padrão para distribuição Apple
+          echo "CERT_NAME=Apple Distribution" >> $CM_ENV
           
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
@@ -31,22 +30,26 @@ workflows:
 
       - name: Create Export Options
         script: |
+          # Usando 'app-store-connect' como sugerido pelo Xcode 16
+          # E forçando o signingCertificate dentro do Plist
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>app-store</string>
+              <string>app-store-connect</string>
               <key>teamID</key>
               <string>$TEAM_ID</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>signingCertificate</key>
+              <string>Apple Distribution</string>
               <key>provisioningProfiles</key>
               <dict>
                   <key>$APP_ID</key>
                   <string>$PROV_UUID</string>
               </dict>
-              <key>signingStyle</key>
-              <string>manual</string>
               <key>manageAppVersionAndBuildNumber</key>
               <true/>
           </dict>
@@ -58,17 +61,10 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🧹 Limpeza profunda de identidades legadas..."
-          
-          # 1. Limpa o .pbxproj (ajustado para o padrão do seu arquivo)
+          echo "🧹 Limpando configurações residuais..."
           sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "";/g' "$XCODE_PROJECT/project.pbxproj"
           sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = ".*";/PROVISIONING_PROFILE_SPECIFIER = "";/g' "$XCODE_PROJECT/project.pbxproj"
-          sed -i '' 's/PROVISIONING_PROFILE = ".*";/PROVISIONING_PROFILE = "";/g' "$XCODE_PROJECT/project.pbxproj"
-          
-          # 2. ATAQUE AO CONFIG.XCCONFIG (O provável culpado)
-          # Procura qualquer arquivo .xcconfig e remove definições de identidade
           find . -name "*.xcconfig" -exec sed -i '' 's/CODE_SIGN_IDENTITY = .*/CODE_SIGN_IDENTITY = /g' {} +
-          find . -name "*.xcconfig" -exec sed -i '' 's/PROVISIONING_PROFILE = .*/PROVISIONING_PROFILE = /g' {} +
 
           chmod +x gradlew
           ./gradlew clean
@@ -76,7 +72,7 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          echo "🚀 Executando Archive com override total..."
+          echo "🚀 Executando Archive..."
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -85,16 +81,17 @@ workflows:
             -destination 'generic/platform=iOS' \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_IDENTITY="$CERT_NAME" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
             -allowProvisioningOffline=YES
 
-          echo "📦 Exportando IPA..."
+          echo "📦 Exportando IPA (ExportArchive)..."
+          # Adicionamos CODE_SIGN_IDENTITY aqui também para reforçar o override
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
             -exportOptionsPlist "/Users/builder/export_options.plist" \
-            CODE_SIGN_IDENTITY="$CERT_NAME"
+            CODE_SIGN_IDENTITY="Apple Distribution"
 
     artifacts:
       - build/ios/ipa/*.ipa
