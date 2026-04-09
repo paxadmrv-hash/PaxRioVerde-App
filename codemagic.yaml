@@ -22,10 +22,10 @@ workflows:
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # Detecta o SHA-1 único do seu certificado para evitar erro de nome (iOS vs Apple Distribution)
-          CERT_SHA1=$(security find-identity -v -p codesigning | grep "Distribution" | head -1 | awk '{print $2}')
-          echo "CERT_SHA1=$CERT_SHA1" >> $CM_ENV
-          echo "✅ Certificado SHA-1 detectado: $CERT_SHA1"
+          # Detecta se o nome é "Apple Distribution" ou "iOS Distribution"
+          CERT_NAME=$(security find-identity -v -p codesigning | grep "Distribution" | head -1 | grep -o '".*"' | sed 's/"//g')
+          echo "CERT_NAME=$CERT_NAME" >> $CM_ENV
+          echo "✅ Identidade detectada: $CERT_NAME"
           
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
@@ -33,6 +33,7 @@ workflows:
 
       - name: Create Export Options
         script: |
+          # Criando o Plist sem fixar o nome do certificado (deixando o Xcode resolver pelo Provisioning Profile)
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -49,8 +50,6 @@ workflows:
               </dict>
               <key>signingStyle</key>
               <string>manual</string>
-              <key>signingCertificate</key>
-              <string>$CERT_SHA1</string>
               <key>manageAppVersionAndBuildNumber</key>
               <true/>
           </dict>
@@ -65,7 +64,7 @@ workflows:
           echo "🧹 Limpando ambiente e neutralizando identidades..."
           chmod +x gradlew
           
-          # Limpa referências a identidades no projeto para evitar que o Xcode tente usar o nome legado
+          # Remove referências a identidades no projeto
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "";/g' {} +
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = ".*";/CODE_SIGN_IDENTITY[sdk=iphoneos*] = "";/g' {} +
 
@@ -89,17 +88,19 @@ workflows:
             CODE_SIGN_IDENTITY="" \
             -allowProvisioningOffline=YES | tee build/ios/logs/xcodebuild_raw_log.txt
 
-          echo "🛠️ Aplicando Patch no metadado do Archive..."
-          # Força o reconhecimento como 'Apple Distribution' dentro dos metadados gerados
-          /usr/libexec/PlistBuddy -c "Set :ApplicationProperties:SigningIdentity 'Apple Distribution'" build/ios/xcarchive/app.xcarchive/Info.plist
-
-          echo "📦 Gerando IPA final via SHA-1 Fingerprint..."
-          # Usar o SHA-1 aqui é a forma mais robusta de garantir que o Xcode use o certificado correto
+          echo "🛠️ Aplicando Patch agressivo no Archive..."
+          # Aqui forçamos a identidade correta em dois lugares dentro do Archive
+          ARCHIVE_PLIST="build/ios/xcarchive/app.xcarchive/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :ApplicationProperties:SigningIdentity '$CERT_NAME'" "$ARCHIVE_PLIST"
+          
+          # Removemos qualquer menção a nomes legados que possam ter vindo do build
+          echo "📦 Gerando IPA final..."
+          # IMPORTANTE: Passamos o nome detectado dinamicamente para o comando de exportação
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
             -exportOptionsPlist "/Users/builder/export_options.plist" \
-            CODE_SIGN_IDENTITY="$CERT_SHA1"
+            CODE_SIGN_IDENTITY="$CERT_NAME"
 
     artifacts:
       - build/ios/ipa/*.ipa
