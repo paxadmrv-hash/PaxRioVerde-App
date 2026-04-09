@@ -21,6 +21,9 @@ workflows:
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
+          CERT_NAME=$(security find-identity -v -p codesigning | grep "Distribution" | head -1 | grep -o '".*"' | sed 's/"//g')
+          echo "CERT_NAME=$CERT_NAME" >> $CM_ENV
+          
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
           echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
@@ -33,13 +36,13 @@ workflows:
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>app-store-connect</string>
+              <string>app-store</string>
               <key>teamID</key>
               <string>$TEAM_ID</string>
               <key>signingStyle</key>
               <string>manual</string>
               <key>signingCertificate</key>
-              <string>Apple Distribution</string>
+              <string>$CERT_NAME</string>
               <key>provisioningProfiles</key>
               <dict>
                   <key>$APP_ID</key>
@@ -56,14 +59,10 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🧹 Limpando configurações de assinatura..."
+          # Limpeza profunda
           sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "";/g' "$XCODE_PROJECT/project.pbxproj"
           sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = ".*";/PROVISIONING_PROFILE_SPECIFIER = "";/g' "$XCODE_PROJECT/project.pbxproj"
-          sed -i '' 's/PROVISIONING_PROFILE = ".*";/PROVISIONING_PROFILE = "";/g' "$XCODE_PROJECT/project.pbxproj"
           
-          find . -name "*.xcconfig" -exec sed -i '' 's/CODE_SIGN_IDENTITY = .*/CODE_SIGN_IDENTITY = /g' {} +
-          find . -name "*.xcconfig" -exec sed -i '' 's/PROVISIONING_PROFILE = .*/PROVISIONING_PROFILE = /g' {} +
-
           chmod +x gradlew
           ./gradlew clean
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
@@ -71,8 +70,8 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          echo "🚀 Gerando Archive..."
-          xcodebuild clean archive \
+          echo "🚀 Iniciando Archive..."
+          xcodebuild archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
@@ -80,16 +79,18 @@ workflows:
             -destination 'generic/platform=iOS' \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGN_IDENTITY="$CERT_NAME" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
             -allowProvisioningOffline=YES
 
           echo "📦 Exportando IPA..."
+          # O segredo está aqui: o exportPath precisa ser onde o artefato vai buscar
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
             -exportOptionsPlist "/Users/builder/export_options.plist"
 
     artifacts:
+      # Usamos o padrão recursivo (**) para garantir que ele ache o .ipa em qualquer subpasta de build
       - build/ios/ipa/*.ipa
-      - build/ios/xcarchive/app.xcarchive
+      - build/ios/xcarchive/*.xcarchive
