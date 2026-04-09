@@ -22,10 +22,10 @@ workflows:
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # Detecta se o nome é "Apple Distribution" ou "iOS Distribution"
+          # Detecta o nome real (Apple Distribution ou iPhone Distribution)
           CERT_NAME=$(security find-identity -v -p codesigning | grep "Distribution" | head -1 | grep -o '".*"' | sed 's/"//g')
           echo "CERT_NAME=$CERT_NAME" >> $CM_ENV
-          echo "✅ Identidade detectada: $CERT_NAME"
+          echo "✅ Identidade detectada no servidor: $CERT_NAME"
           
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
@@ -33,7 +33,7 @@ workflows:
 
       - name: Create Export Options
         script: |
-          # Criando o Plist sem fixar o nome do certificado (deixando o Xcode resolver pelo Provisioning Profile)
+          # Criamos um plist minimalista. Ao usar 'manual' com o UUID, o Xcode localiza o certificado correto sozinho.
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -61,10 +61,10 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🧹 Limpando ambiente e neutralizando identidades..."
+          echo "🧹 Limpando vestígios de identidades legadas..."
           chmod +x gradlew
           
-          # Remove referências a identidades no projeto
+          # Remove qualquer menção a nomes de certificados fixos no projeto
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "";/g' {} +
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = ".*";/CODE_SIGN_IDENTITY[sdk=iphoneos*] = "";/g' {} +
 
@@ -74,7 +74,8 @@ workflows:
           mkdir -p build/ios/ipa
           mkdir -p build/ios/logs
 
-          echo "🚀 Executando Archive..."
+          echo "🚀 Executando Archive com Identidade Explícita..."
+          # Passamos o CERT_NAME já no Archive para garantir consistência
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -85,17 +86,15 @@ workflows:
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
-            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_IDENTITY="$CERT_NAME" \
             -allowProvisioningOffline=YES | tee build/ios/logs/xcodebuild_raw_log.txt
 
-          echo "🛠️ Aplicando Patch agressivo no Archive..."
-          # Aqui forçamos a identidade correta em dois lugares dentro do Archive
-          ARCHIVE_PLIST="build/ios/xcarchive/app.xcarchive/Info.plist"
-          /usr/libexec/PlistBuddy -c "Set :ApplicationProperties:SigningIdentity '$CERT_NAME'" "$ARCHIVE_PLIST"
-          
-          # Removemos qualquer menção a nomes legados que possam ter vindo do build
+          echo "🛠️ Atualizando metadados do Archive..."
+          # Força o nome detectado dentro do arquivo gerado antes da exportação
+          /usr/libexec/PlistBuddy -c "Set :ApplicationProperties:SigningIdentity '$CERT_NAME'" build/ios/xcarchive/app.xcarchive/Info.plist
+
           echo "📦 Gerando IPA final..."
-          # IMPORTANTE: Passamos o nome detectado dinamicamente para o comando de exportação
+          # Aqui está o pulo do gato: usamos o nome detectado e removemos o erro de 'iOS Distribution'
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
