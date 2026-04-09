@@ -5,7 +5,7 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - "Pax Rio Verde"
+        - "Pax Rio Verde" # Certifique-se de que TEAM_ID e APP_ID estão neste grupo
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
@@ -18,13 +18,12 @@ workflows:
 
       - name: Fetch Signing Files (App Store Connect)
         script: |
-          # O comando fetch-signing-files baixa os perfis e certificados da Apple.
-          # A flag --create tenta gerar um novo certificado se a chave privada estiver faltando.
+          # Importante: Os comandos abaixo devem permanecer em inglês
           app-store-connect fetch-signing-files "$APP_ID" \
             --type IOS_APP_STORE \
             --create
           
-          # Este é o comando que realmente instala os certificados baixados no chaveiro do macOS
+          # Instala os certificados gerados/baixados no chaveiro do macOS
           keychain add-certificates
 
       - name: Set up code signing settings on Xcode project
@@ -35,14 +34,15 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
 
-          echo "🧹 Limpando ambiente e compilando..."
+          echo "🧹 Limpando ambiente e compilando Kotlin..."
           chmod +x gradlew
           ./gradlew clean
           
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          echo "🚀 Gerando IPA da Pax Rio Verde..."
+          echo "🚀 Gerando Archive e Exportando IPA..."
+          # Comando unificado do Codemagic que evita erros de exportação manual
           xcode-project build-ipa \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
