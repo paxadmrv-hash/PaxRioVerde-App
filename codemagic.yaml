@@ -10,9 +10,7 @@ workflows:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
-        # As variáveis abaixo devem bater com o que você configurou na tela de API
-        # Se você não as salvou no grupo "Pax Rio Verde", o Codemagic busca
-        # automaticamente da integração global se os nomes estiverem corretos.
+
     scripts:
       - name: Initialize Keychain
         script: |
@@ -21,11 +19,11 @@ workflows:
 
       - name: Fetch Signing Files (App Store Connect)
         script: |
-          # O Codemagic CLI preenche automaticamente se a integração estiver ativa,
-          # mas vamos garantir passando o comando que força a busca pela API vinculada.
+          # O segredo é a flag --generate-content para resolver o erro de Private Key
           app-store-connect fetch-signing-files "$APP_ID" \
             --type IOS_APP_STORE \
-            --create
+            --create \
+            --generate-content
           
           keychain add-certificates
 
@@ -37,12 +35,68 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
+          echo "🧹 Limpando build anterior..."
           chmod +x gradlew
           ./gradlew clean
           
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
+          echo "🚀 Gerando IPA assinado..."
+          xcode-project build-ipa \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -archive-path build/ios/xcarchive/app.xcarchive \
+            -ipa-path build/ios/ipa/PaxRioVerde.ipa \
+            -configuration Release
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - build/ios/xcarchive/*.xcarchiveworkflows:
+  ios-workflow:
+    name: Pax Rio Verde iOS Final (Automated Signing)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      groups:
+        - "Pax Rio Verde"
+      vars:
+        XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
+        XCODE_SCHEME: "iosApp"
+        APP_ID: "br.com.paxrioverde.app"
+
+    scripts:
+      - name: Initialize Keychain
+        script: |
+          keychain initialize
+          keychain make-default
+
+      - name: Fetch Signing Files (App Store Connect)
+        script: |
+          # O segredo é a flag --generate-content para resolver o erro de Private Key
+          app-store-connect fetch-signing-files "$APP_ID" \
+            --type IOS_APP_STORE \
+            --create \
+            --generate-content
+          
+          keychain add-certificates
+
+      - name: Set up code signing settings on Xcode project
+        script: xcode-project use-profiles
+
+      - name: Build and Sign IPA
+        script: |
+          #!/usr/bin/env bash
+          set -e -o pipefail
+          
+          echo "🧹 Limpando build anterior..."
+          chmod +x gradlew
+          ./gradlew clean
+          
+          mkdir -p build/ios/xcarchive
+          mkdir -p build/ios/ipa
+
+          echo "🚀 Gerando IPA assinado..."
           xcode-project build-ipa \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
