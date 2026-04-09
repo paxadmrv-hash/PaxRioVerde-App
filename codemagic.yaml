@@ -1,105 +1,56 @@
 workflows:
   ios-workflow:
-    name: Pax Rio Verde iOS Final Build
+    name: Pax Rio Verde iOS Final (Automated Signing)
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
       groups:
-        - "Pax Rio Verde"
+        - "Pax Rio Verde" # Certifique-se de que APP_ID e TEAM_ID estão aqui
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         TEAM_ID: "264TWUW2L6"
         APP_ID: "br.com.paxrioverde.app"
-        PROV_UUID: "f83a914d-202a-436e-9e51-257ae86fccd0"
+
     scripts:
       - name: Initialize Keychain
         script: keychain initialize
 
-      - name: Install Credentials
+      - name: Fetch Signing Files (App Store Connect)
         script: |
-          echo "📥 Instalando certificado..."
-          echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
-          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
-
-          echo "🔍 LISTANDO TODOS OS CERTIFICADOS NO KEYCHAIN:"
-          security find-identity -v -p codesigning
-
-          # 🎯 A JOGADA DE MESTRE: Pegar o HASH (SHA-1) em vez do nome
-          # O 'awk {print $2}' pega exatamente a coluna onde fica o código alfanumérico do certificado
-          CERT_HASH=$(security find-identity -v -p codesigning | grep -i "Distribution" | head -1 | awk '{print $2}')
+          # Este comando substitui toda aquela instalação manual de P12.
+          # Ele baixa o certificado e o Profile direto da Apple usando a API que você configurou.
+          app-store-connect fetch-signing-files "$APP_ID" \
+            --type IOS_APP_STORE \
+            --create
           
-          if [ -z "$CERT_HASH" ]; then
-            echo "⚠️ ALERTA CRÍTICO: Nenhum certificado de Distribuição encontrado no keychain!"
-          fi
+          # Importa os certificados baixados para o keychain do Codemagic
+          keychain add-certificates
 
-          echo "CERT_HASH=$CERT_HASH" >> $CM_ENV
-          echo "✅ Hash do Certificado detectado: $CERT_HASH"
-
-          echo "📥 Instalando provisioning profile..."
-          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
-          mkdir -p "$PROFILES_DIR"
-          echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
-
-      - name: Create Export Options
-        script: |
-          echo "🛠 Criando export_options.plist usando o HASH ($CERT_HASH)..."
-          cat > /Users/builder/export_options.plist <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>app-store-connect</string>
-              <key>teamID</key>
-              <string>$TEAM_ID</string>
-              <key>signingStyle</key>
-              <string>manual</string>
-              <key>signingCertificate</key>
-              <string>$CERT_HASH</string>
-              <key>provisioningProfiles</key>
-              <dict>
-                  <key>$APP_ID</key>
-                  <string>$PROV_UUID</string>
-              </dict>
-              <key>manageAppVersionAndBuildNumber</key>
-              <false/>
-          </dict>
-          </plist>
-          EOF
+      - name: Set up code signing settings on Xcode project
+        script: xcode-project use-profiles
 
       - name: Build and Sign IPA
         script: |
           #!/usr/bin/env bash
           set -e -o pipefail
 
-          echo "🧹 Limpando ambiente e forçando Manual Signing..."
+          echo "🧹 Limpando ambiente e compilando Kotlin..."
           chmod +x gradlew
           ./gradlew clean
           
-          # Garante que o projeto aceite a assinatura manual no CI
-          sed -i '' 's/CODE_SIGN_STYLE = .*/CODE_SIGN_STYLE = Manual;/g' "$XCODE_PROJECT/project.pbxproj"
-
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          echo "🚀 Gerando Archive (usando o Hash)..."
-          xcodebuild archive \
+          echo "🚀 Gerando Archive e Exportando IPA..."
+          # O comando 'build-ipa' do Codemagic é um wrapper que resolve 
+          # automaticamente os problemas de export_options e identidades.
+          xcode-project build-ipa \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
-            -configuration Release \
-            -archivePath build/ios/xcarchive/app.xcarchive \
-            -destination 'generic/platform=iOS' \
-            CODE_SIGN_STYLE="Manual" \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_IDENTITY="$CERT_HASH" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID"
-
-          echo "📦 Exportando IPA (guiado pelo Plist com Hash)..."
-          xcodebuild -exportArchive \
-            -archivePath build/ios/xcarchive/app.xcarchive \
-            -exportPath build/ios/ipa \
-            -exportOptionsPlist "/Users/builder/export_options.plist"
+            -archive-path build/ios/xcarchive/app.xcarchive \
+            -ipa-path build/ios/ipa/PaxRioVerde.ipa \
+            -configuration Release
 
     artifacts:
       - build/ios/ipa/*.ipa
