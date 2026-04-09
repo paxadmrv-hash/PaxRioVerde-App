@@ -3,33 +3,39 @@ workflows:
     name: Pax Rio Verde iOS Final Build
     instance_type: mac_mini_m2
     max_build_duration: 60
+
     environment:
       groups:
         - "Pax Rio Verde"
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
-        APP_ID: "br.com.paxrioverde.app"
         TEAM_ID: "264TWUW2L6"
+        APP_ID: "br.com.paxrioverde.app"
         PROV_UUID: "f83a914d-202a-436e-9e51-257ae86fccd0"
+
     scripts:
       - name: Initialize Keychain
         script: keychain initialize
 
-      - name: Install Credentials
+      - name: Install Certificate & Provisioning Profile
         script: |
+          echo "📥 Instalando certificado..."
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
-          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
-          
-          # Detecta o nome do certificado
-          CERT_NAME=$(security find-identity -v -p codesigning | grep "Distribution" | head -1 | grep -o '".*"' | sed 's/"//g')
-          echo "CERT_NAME=$CERT_NAME" >> $CM_ENV
-          
-          # Instala o Provisioning Profile no local padrão do Xcode
+
+          keychain add-certificates \
+            --certificate /tmp/certificate.p12 \
+            --certificate-password "$CERTIFICATE_PASSWORD"
+
+          echo "📥 Instalando provisioning profile..."
+          echo "$PROVISIONING_PROFILE" | base64 --decode > /tmp/profile.mobileprovision
+
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
-          echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
-          echo "✅ Profile instalado em: $PROFILES_DIR/$PROV_UUID.mobileprovision"
+          cp /tmp/profile.mobileprovision "$PROFILES_DIR/$PROV_UUID.mobileprovision"
+
+          echo "🔍 Certificados disponíveis:"
+          security find-identity -v -p codesigning
 
       - name: Create Export Options
         script: |
@@ -40,17 +46,25 @@ workflows:
           <dict>
               <key>method</key>
               <string>app-store-connect</string>
+
               <key>teamID</key>
               <string>$TEAM_ID</string>
+
               <key>signingStyle</key>
               <string>manual</string>
-              <key>signingCertificate</key>
-              <string>$CERT_NAME</string>
+
               <key>provisioningProfiles</key>
               <dict>
                   <key>$APP_ID</key>
                   <string>$PROV_UUID</string>
               </dict>
+
+              <key>stripSwiftSymbols</key>
+              <true/>
+
+              <key>compileBitcode</key>
+              <false/>
+
               <key>manageAppVersionAndBuildNumber</key>
               <true/>
           </dict>
@@ -61,35 +75,41 @@ workflows:
         script: |
           #!/usr/bin/env bash
           set -e -o pipefail
-          
-          echo "🧹 Limpando configurações manuais antigas..."
-          sed -i '' 's/CODE_SIGN_STYLE = .*/CODE_SIGN_STYLE = Manual;/g' "$XCODE_PROJECT/project.pbxproj"
-          
+
+          echo "🧹 Limpando ambiente..."
           chmod +x gradlew
           ./gradlew clean
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
-          
+
+          echo "🧹 Limpando configs antigas de signing..."
+
+          sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = .*/PROVISIONING_PROFILE_SPECIFIER = "";/g' "$XCODE_PROJECT/project.pbxproj"
+          sed -i '' 's/PROVISIONING_PROFILE = .*/PROVISIONING_PROFILE = "";/g' "$XCODE_PROJECT/project.pbxproj"
+          sed -i '' 's/CODE_SIGN_IDENTITY = .*/CODE_SIGN_IDENTITY = "";/g' "$XCODE_PROJECT/project.pbxproj"
+          sed -i '' 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' "$XCODE_PROJECT/project.pbxproj"
+
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          echo "🚀 Gerando Archive..."
+          echo "🚀 Iniciando Archive..."
+
           xcodebuild archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -destination 'generic/platform=iOS' \
-            CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_IDENTITY="$CERT_NAME" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
-            -allowProvisioningOffline=YES
+            CODE_SIGN_STYLE="Automatic" \
+            -allowProvisioningUpdates
 
           echo "📦 Exportando IPA..."
+
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
             -exportOptionsPlist "/Users/builder/export_options.plist"
+
     artifacts:
       - build/ios/ipa/*.ipa
       - build/ios/xcarchive/*.xcarchive
