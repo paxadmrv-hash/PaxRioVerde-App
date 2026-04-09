@@ -22,10 +22,19 @@ workflows:
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
-          # Detecta o nome para usar APENAS no Archive
-          CERT_NAME=$(security find-identity -v -p codesigning | grep "Distribution" | head -1 | grep -o '".*"' | sed 's/"//g')
-          echo "CERT_NAME=$CERT_NAME" >> $CM_ENV
-          echo "✅ Certificado detectado: $CERT_NAME"
+          echo "🔍 LISTANDO TODOS OS CERTIFICADOS NO KEYCHAIN:"
+          security find-identity -v -p codesigning
+
+          # 🎯 A JOGADA DE MESTRE: Pegar o HASH (SHA-1) em vez do nome
+          # O 'awk {print $2}' pega exatamente a coluna onde fica o código alfanumérico do certificado
+          CERT_HASH=$(security find-identity -v -p codesigning | grep -i "Distribution" | head -1 | awk '{print $2}')
+          
+          if [ -z "$CERT_HASH" ]; then
+            echo "⚠️ ALERTA CRÍTICO: Nenhum certificado de Distribuição encontrado no keychain!"
+          fi
+
+          echo "CERT_HASH=$CERT_HASH" >> $CM_ENV
+          echo "✅ Hash do Certificado detectado: $CERT_HASH"
 
           echo "📥 Instalando provisioning profile..."
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
@@ -34,7 +43,7 @@ workflows:
 
       - name: Create Export Options
         script: |
-          echo "🛠 Criando export_options.plist (SEM a chave signingCertificate)..."
+          echo "🛠 Criando export_options.plist usando o HASH ($CERT_HASH)..."
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -46,6 +55,8 @@ workflows:
               <string>$TEAM_ID</string>
               <key>signingStyle</key>
               <string>manual</string>
+              <key>signingCertificate</key>
+              <string>$CERT_HASH</string>
               <key>provisioningProfiles</key>
               <dict>
                   <key>$APP_ID</key>
@@ -66,13 +77,13 @@ workflows:
           chmod +x gradlew
           ./gradlew clean
           
+          # Garante que o projeto aceite a assinatura manual no CI
           sed -i '' 's/CODE_SIGN_STYLE = .*/CODE_SIGN_STYLE = Manual;/g' "$XCODE_PROJECT/project.pbxproj"
 
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          echo "🚀 Gerando Archive..."
-          # Aqui mantemos as informações explícitas porque o Archive precisa delas para compilar
+          echo "🚀 Gerando Archive (usando o Hash)..."
           xcodebuild archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -81,11 +92,10 @@ workflows:
             -destination 'generic/platform=iOS' \
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_IDENTITY="$CERT_NAME" \
+            CODE_SIGN_IDENTITY="$CERT_HASH" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID"
 
-          echo "📦 Exportando IPA..."
-          # O exportArchive agora vai se basear puramente no Plist enxuto e no Archive recém-criado
+          echo "📦 Exportando IPA (guiado pelo Plist com Hash)..."
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
