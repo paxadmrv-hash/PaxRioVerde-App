@@ -3,45 +3,59 @@ workflows:
     name: Pax Rio Verde iOS Final Build
     instance_type: mac_mini_m2
     max_build_duration: 60
+
     environment:
       groups:
-        - "Pax Rio Verde"
+        - "Pax Rio Verde" # Certifique-se de que CERTIFICATE_P12, CERTIFICATE_PASSWORD e PROVISIONING_PROFILE estão aqui
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         TEAM_ID: "264TWUW2L6"
         APP_ID: "br.com.paxrioverde.app"
         PROV_UUID: "f83a914d-202a-436e-9e51-257ae86fccd0"
+
     scripts:
       - name: Initialize Keychain
         script: keychain initialize
 
-      - name: Install Credentials
+      - name: Install Credentials and Detect Cert
         script: |
           echo "📥 Instalando certificado..."
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
-          keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
-          # Detecta o nome real do certificado instalado (pode ser "Apple Distribution" ou "iOS Distribution")
+          keychain add-certificates \
+            --certificate /tmp/certificate.p12 \
+            --certificate-password "$CERTIFICATE_PASSWORD"
+
+          # 🔍 DETECÇÃO DINÂMICA DO NOME DO CERTIFICADO
+          # Isso resolve o erro "No signing certificate found" pegando o nome exato instalado
           CERT_NAME=$(security find-identity -v -p codesigning | grep "Distribution" | head -1 | grep -o '".*"' | sed 's/"//g')
+          
+          if [ -z "$CERT_NAME" ]; then
+            echo "⚠️ AVISO: Nenhum certificado de distribuição encontrado! Usando padrão Apple Distribution."
+            CERT_NAME="Apple Distribution"
+          fi
+          
+          # Exporta para as próximas etapas do Codemagic
           echo "CERT_NAME=$CERT_NAME" >> $CM_ENV
           echo "✅ Certificado detectado: $CERT_NAME"
 
           echo "📥 Instalando provisioning profile..."
+          echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > /tmp/profile.mobileprovision
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
-          echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
+          cp /tmp/profile.mobileprovision "$PROFILES_DIR/$PROV_UUID.mobileprovision"
 
       - name: Create Export Options
         script: |
-          # Usamos a variável CERT_NAME detectada para garantir que o nome esteja 100% correto
+          echo "🛠 Criando export_options.plist com método app-store-connect..."
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>app-store</string>
+              <string>app-store-connect</string>
               <key>teamID</key>
               <string>$TEAM_ID</string>
               <key>signingStyle</key>
@@ -64,18 +78,17 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
 
-          echo "🧹 Limpando ambiente..."
+          echo "🧹 Limpando ambiente e forçando Manual Signing..."
           chmod +x gradlew
           ./gradlew clean
-          rm -rf ~/Library/Developer/Xcode/DerivedData/*
-
-          # Força o modo manual no projeto
+          
+          # Garante que o projeto ignore configurações automáticas de Mac local
           sed -i '' 's/CODE_SIGN_STYLE = .*/CODE_SIGN_STYLE = Manual;/g' "$XCODE_PROJECT/project.pbxproj"
 
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          echo "🚀 Gerando Archive..."
+          echo "🚀 Iniciando Archive..."
           xcodebuild archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -89,11 +102,11 @@ workflows:
             -allowProvisioningOffline=YES
 
           echo "📦 Exportando IPA..."
-          # Aqui removemos o CODE_SIGN_IDENTITY manual para o xcodebuild ler direto do Plist corrigido
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
-            -exportOptionsPlist "/Users/builder/export_options.plist"
+            -exportOptionsPlist "/Users/builder/export_options.plist" \
+            CODE_SIGN_IDENTITY="$CERT_NAME"
 
     artifacts:
       - build/ios/ipa/*.ipa
