@@ -21,15 +21,24 @@ workflows:
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # Forçamos o nome moderno que vimos nas suas fotos
-          echo "CERT_NAME=Apple Distribution" >> $CM_ENV
-          
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
           echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
 
-      - name: Create Export Options
+      - name: Create Force Settings
         script: |
+          # Criamos um arquivo de configuração que tem a última palavra sobre o build
+          cat > /tmp/force_signing.xcconfig <<EOF
+          CODE_SIGN_STYLE = Manual
+          CODE_SIGN_IDENTITY = Apple Distribution
+          CODE_SIGN_IDENTITY[sdk=iphoneos*] = Apple Distribution
+          DEVELOPMENT_TEAM = $TEAM_ID
+          PROVISIONING_PROFILE = $PROV_UUID
+          PROVISIONING_PROFILE_SPECIFIER = $PROV_UUID
+          AD_HOC_CODE_SIGNING_ALLOWED = NO
+          EOF
+          
+          # Criamos o export_options atualizado
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -59,34 +68,23 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🛠️ Aplicando substituição global de identidade..."
-          
-          # 1. Substitui qualquer 'iOS Distribution' por 'Apple Distribution' no projeto inteiro
-          find . -name "project.pbxproj" -exec sed -i '' 's/iOS Distribution/Apple Distribution/g' {} +
-          
-          # 2. Ataca o Config.xcconfig e outros arquivos de configuração
-          find . -name "*.xcconfig" -exec sed -i '' 's/iOS Distribution/Apple Distribution/g' {} +
-          
-          # 3. Garante que o SDK-specific code sign não aponte para o nome antigo
-          sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = ".*";/CODE_SIGN_IDENTITY[sdk=iphoneos*] = "Apple Distribution";/g' "$XCODE_PROJECT/project.pbxproj"
-
+          echo "🧹 Limpando DerivedData e caches..."
+          rm -rf ~/Library/Developer/Xcode/DerivedData/*
           chmod +x gradlew
           ./gradlew clean
-          rm -rf ~/Library/Developer/Xcode/DerivedData/*
+
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          echo "🚀 Executando Archive (Forçando Apple Distribution)..."
-          xcodebuild clean archive \
+          echo "🚀 Executando Archive com Force Config..."
+          # Usamos o flag -xcconfig para forçar as nossas regras sobre o projeto
+          xcodebuild archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -destination 'generic/platform=iOS' \
-            CODE_SIGN_STYLE="Manual" \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
+            -xcconfig /tmp/force_signing.xcconfig \
             -allowProvisioningOffline=YES
 
           echo "📦 Exportando IPA..."
@@ -94,7 +92,7 @@ workflows:
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
             -exportOptionsPlist "/Users/builder/export_options.plist" \
-            CODE_SIGN_IDENTITY="Apple Distribution"
+            -xcconfig /tmp/force_signing.xcconfig
 
     artifacts:
       - build/ios/ipa/*.ipa
