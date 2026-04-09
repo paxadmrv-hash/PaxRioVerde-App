@@ -5,7 +5,7 @@ workflows:
     max_build_duration: 60
     environment:
       groups:
-        - "Pax Rio Verde" # Certifique-se de que TEAM_ID e APP_ID estão neste grupo
+        - "Pax Rio Verde"
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
@@ -14,16 +14,20 @@ workflows:
 
     scripts:
       - name: Initialize Keychain
-        script: keychain initialize
+        script: |
+          keychain initialize
+          # Remove qualquer resquício de certificados antigos da máquina de build
+          keychain set-default
 
       - name: Fetch Signing Files (App Store Connect)
         script: |
-          # Importante: Os comandos abaixo devem permanecer em inglês
+          # O comando abaixo agora força a criação e ignora certificados sem chave privada
           app-store-connect fetch-signing-files "$APP_ID" \
             --type IOS_APP_STORE \
-            --create
+            --create \
+            --generate-content
           
-          # Instala os certificados gerados/baixados no chaveiro do macOS
+          # Instala o que foi gerado agora
           keychain add-certificates
 
       - name: Set up code signing settings on Xcode project
@@ -34,15 +38,15 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
 
-          echo "🧹 Limpando ambiente e compilando Kotlin..."
+          echo "🧹 Limpando ambiente..."
           chmod +x gradlew
           ./gradlew clean
           
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          echo "🚀 Gerando Archive e Exportando IPA..."
-          # Comando unificado do Codemagic que evita erros de exportação manual
+          echo "🚀 Gerando IPA..."
+          # Usando o comando de build que força o uso do perfil baixado
           xcode-project build-ipa \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
