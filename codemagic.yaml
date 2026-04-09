@@ -22,7 +22,7 @@ workflows:
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
-          # 🔍 Captura o nome exato do certificado para evitar o erro "No signing certificate found"
+          # 🔍 Detecta o nome real exato (Apple Distribution ou iOS Distribution)
           CERT_NAME=$(security find-identity -v -p codesigning | grep "Distribution" | head -1 | grep -o '".*"' | sed 's/"//g')
           echo "CERT_NAME=$CERT_NAME" >> $CM_ENV
           echo "✅ Certificado detectado: $CERT_NAME"
@@ -64,11 +64,11 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
 
-          echo "🧹 Limpando ambiente..."
+          echo "🧹 Limpando ambiente e forçando Manual Signing..."
           chmod +x gradlew
           ./gradlew clean
           
-          # Força o modo manual no projeto antes de rodar
+          # Garante que o projeto aceite a assinatura manual no CI
           sed -i '' 's/CODE_SIGN_STYLE = .*/CODE_SIGN_STYLE = Manual;/g' "$XCODE_PROJECT/project.pbxproj"
 
           mkdir -p build/ios/xcarchive
@@ -88,12 +88,12 @@ workflows:
             -allowProvisioningOffline=YES
 
           echo "📦 Exportando IPA..."
-          # Aqui forçamos o CODE_SIGN_IDENTITY novamente para o exportador não tentar adivinhar
+          # Removido o CODE_SIGN_IDENTITY do comando para forçar o xcodebuild a ler do export_options.plist
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
             -exportOptionsPlist "/Users/builder/export_options.plist" \
-            CODE_SIGN_IDENTITY="$CERT_NAME"
+            -allowProvisioningOffline=YES
 
     artifacts:
       - build/ios/ipa/*.ipa
