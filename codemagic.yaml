@@ -22,10 +22,10 @@ workflows:
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
-          # 🔍 Detecta o nome real exato (evita o erro 'No signing certificate found')
+          # 🔍 Captura o nome exato do certificado para evitar o erro "No signing certificate found"
           CERT_NAME=$(security find-identity -v -p codesigning | grep "Distribution" | head -1 | grep -o '".*"' | sed 's/"//g')
           echo "CERT_NAME=$CERT_NAME" >> $CM_ENV
-          echo "✅ Certificado detectado no Keychain: $CERT_NAME"
+          echo "✅ Certificado detectado: $CERT_NAME"
 
           echo "📥 Instalando provisioning profile..."
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
@@ -34,7 +34,7 @@ workflows:
 
       - name: Create Export Options
         script: |
-          echo "🛠 Criando plist com certificado: $CERT_NAME"
+          echo "🛠 Criando export_options.plist..."
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -64,11 +64,11 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
 
-          echo "🧹 Limpando e forçando Manual Signing..."
+          echo "🧹 Limpando ambiente..."
           chmod +x gradlew
           ./gradlew clean
           
-          # Desativa o signing automático no arquivo do projeto
+          # Força o modo manual no projeto antes de rodar
           sed -i '' 's/CODE_SIGN_STYLE = .*/CODE_SIGN_STYLE = Manual;/g' "$XCODE_PROJECT/project.pbxproj"
 
           mkdir -p build/ios/xcarchive
@@ -88,7 +88,7 @@ workflows:
             -allowProvisioningOffline=YES
 
           echo "📦 Exportando IPA..."
-          # Passamos o CODE_SIGN_IDENTITY aqui também para garantir que o exportador use o mesmo do archive
+          # Aqui forçamos o CODE_SIGN_IDENTITY novamente para o exportador não tentar adivinhar
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
