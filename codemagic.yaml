@@ -10,15 +10,13 @@ workflows:
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
-        APP_ID: "br.com.paxrioverde.app"
         TEAM_ID: "264TWUW2L6"
-        PROV_UUID: "f83a914d-202a-436e-9e51-257ae86fccd0"
 
     scripts:
       - name: Initialize Keychain
         script: keychain initialize
 
-      - name: Install Certificates & Profiles
+      - name: Install Certificates
         script: |
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
 
@@ -29,13 +27,8 @@ workflows:
           echo "🔍 Certificados disponíveis:"
           security find-identity -v -p codesigning
 
-          # Forçando padrão novo da Apple
+          # Forçando padrão Apple moderno
           echo "CERT_NAME=Apple Distribution" >> $CM_ENV
-
-          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
-          mkdir -p "$PROFILES_DIR"
-
-          echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
 
       - name: Create Export Options
         script: |
@@ -68,6 +61,11 @@ workflows:
           chmod +x gradlew
           ./gradlew clean
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
+
+          echo "🧹 Removendo conflitos de assinatura do projeto..."
+          sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = ".*";/PROVISIONING_PROFILE_SPECIFIER = "";/g' "$XCODE_PROJECT/project.pbxproj"
+          sed -i '' 's/PROVISIONING_PROFILE = ".*";/PROVISIONING_PROFILE = "";/g' "$XCODE_PROJECT/project.pbxproj"
+          sed -i '' 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' "$XCODE_PROJECT/project.pbxproj"
 
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
