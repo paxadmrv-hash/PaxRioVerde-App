@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: Pax Rio Verde iOS Final
+    name: Pax Rio Verde iOS Final (Automated)
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
@@ -9,17 +9,24 @@ workflows:
       vars:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
+        APP_ID: "br.com.paxrioverde.app"
 
     scripts:
       - name: Initialize Keychain
-        script: keychain initialize
-
-      - name: Fetch Signing Files
         script: |
-          # Este comando agora vai usar as variáveis CERTIFICATE_P12 e PROVISIONING_PROFILE
-          # que você subiu na interface do Codemagic.
-          app-store-connect fetch-signing-files --type IOS_APP_STORE
+          keychain initialize
+          keychain make-default
+
+      - name: Fetch Signing Files (App Store Connect)
+        script: |
+          # O segredo da automação:
+          # 1. Usamos as variáveis de API (Issuer ID, Key ID, Private Key) que você salvou.
+          # 2. A flag --create permite que o Codemagic crie o certificado se não achar um válido com chave.
+          app-store-connect fetch-signing-files "$APP_ID" \
+            --type IOS_APP_STORE \
+            --create
           
+          # Garante que o certificado criado seja instalado no chaveiro do build
           keychain add-certificates
 
       - name: Set up code signing settings on Xcode project
@@ -30,12 +37,14 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
+          echo "🧹 Limpando ambiente..."
           chmod +x gradlew
           ./gradlew clean
           
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
+          echo "🚀 Compilando e Assinando automaticamente..."
           xcode-project build-ipa \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -45,3 +54,4 @@ workflows:
 
     artifacts:
       - build/ios/ipa/*.ipa
+      - build/ios/xcarchive/*.xcarchive
