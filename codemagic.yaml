@@ -21,7 +21,7 @@ workflows:
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # Garante que usaremos o nome padrão para distribuição Apple
+          # Forçamos o nome moderno que vimos nas suas fotos
           echo "CERT_NAME=Apple Distribution" >> $CM_ENV
           
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
@@ -30,8 +30,6 @@ workflows:
 
       - name: Create Export Options
         script: |
-          # Usando 'app-store-connect' como sugerido pelo Xcode 16
-          # E forçando o signingCertificate dentro do Plist
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -61,10 +59,16 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🧹 Limpando configurações residuais..."
-          sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "";/g' "$XCODE_PROJECT/project.pbxproj"
-          sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = ".*";/PROVISIONING_PROFILE_SPECIFIER = "";/g' "$XCODE_PROJECT/project.pbxproj"
-          find . -name "*.xcconfig" -exec sed -i '' 's/CODE_SIGN_IDENTITY = .*/CODE_SIGN_IDENTITY = /g' {} +
+          echo "🛠️ Aplicando substituição global de identidade..."
+          
+          # 1. Substitui qualquer 'iOS Distribution' por 'Apple Distribution' no projeto inteiro
+          find . -name "project.pbxproj" -exec sed -i '' 's/iOS Distribution/Apple Distribution/g' {} +
+          
+          # 2. Ataca o Config.xcconfig e outros arquivos de configuração
+          find . -name "*.xcconfig" -exec sed -i '' 's/iOS Distribution/Apple Distribution/g' {} +
+          
+          # 3. Garante que o SDK-specific code sign não aponte para o nome antigo
+          sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = ".*";/CODE_SIGN_IDENTITY[sdk=iphoneos*] = "Apple Distribution";/g' "$XCODE_PROJECT/project.pbxproj"
 
           chmod +x gradlew
           ./gradlew clean
@@ -72,7 +76,7 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          echo "🚀 Executando Archive..."
+          echo "🚀 Executando Archive (Forçando Apple Distribution)..."
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -85,8 +89,7 @@ workflows:
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
             -allowProvisioningOffline=YES
 
-          echo "📦 Exportando IPA (ExportArchive)..."
-          # Adicionamos CODE_SIGN_IDENTITY aqui também para reforçar o override
+          echo "📦 Exportando IPA..."
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
