@@ -16,7 +16,7 @@ workflows:
       - name: Initialize Keychain
         script: keychain initialize
 
-      - name: Install Certificates
+      - name: Install Certificate
         script: |
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
 
@@ -26,9 +26,6 @@ workflows:
 
           echo "🔍 Certificados disponíveis:"
           security find-identity -v -p codesigning
-
-          # Forçando padrão Apple moderno
-          echo "CERT_NAME=Apple Distribution" >> $CM_ENV
 
       - name: Create Export Options
         script: |
@@ -46,6 +43,12 @@ workflows:
               <key>signingStyle</key>
               <string>automatic</string>
 
+              <key>stripSwiftSymbols</key>
+              <true/>
+
+              <key>compileBitcode</key>
+              <false/>
+
               <key>manageAppVersionAndBuildNumber</key>
               <true/>
           </dict>
@@ -57,31 +60,37 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
 
-          echo "🧹 Limpando projeto..."
+          echo "🧹 Limpando ambiente..."
           chmod +x gradlew
           ./gradlew clean
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
 
-          echo "🧹 Removendo conflitos de assinatura do projeto..."
-          sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = ".*";/PROVISIONING_PROFILE_SPECIFIER = "";/g' "$XCODE_PROJECT/project.pbxproj"
-          sed -i '' 's/PROVISIONING_PROFILE = ".*";/PROVISIONING_PROFILE = "";/g' "$XCODE_PROJECT/project.pbxproj"
+          echo "🧹 Limpando COMPLETAMENTE o signing do projeto..."
+
+          # Remove qualquer configuração manual de provisioning
+          sed -i '' 's/PROVISIONING_PROFILE_SPECIFIER = .*/PROVISIONING_PROFILE_SPECIFIER = "";/g' "$XCODE_PROJECT/project.pbxproj"
+          sed -i '' 's/PROVISIONING_PROFILE = .*/PROVISIONING_PROFILE = "";/g' "$XCODE_PROJECT/project.pbxproj"
+
+          # Remove QUALQUER identidade de assinatura
+          sed -i '' 's/CODE_SIGN_IDENTITY = .*/CODE_SIGN_IDENTITY = "";/g' "$XCODE_PROJECT/project.pbxproj"
+
+          # Força assinatura automática
           sed -i '' 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' "$XCODE_PROJECT/project.pbxproj"
 
-          mkdir -p build/ios/xcarchive
-          mkdir -p build/ios/ipa
-
           echo "🚀 Iniciando Archive..."
+
           xcodebuild archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -destination 'generic/platform=iOS' \
-            CODE_SIGN_STYLE="Automatic" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_STYLE="Automatic" \
             -allowProvisioningUpdates
 
           echo "📦 Exportando IPA..."
+
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
