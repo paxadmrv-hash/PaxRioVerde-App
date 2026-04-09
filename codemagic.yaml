@@ -22,25 +22,21 @@ workflows:
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
           
-          # Detecta o nome real (Apple Distribution ou iPhone Distribution)
-          CERT_NAME=$(security find-identity -v -p codesigning | grep "Distribution" | head -1 | grep -o '".*"' | sed 's/"//g')
-          echo "CERT_NAME=$CERT_NAME" >> $CM_ENV
-          echo "✅ Identidade detectada no servidor: $CERT_NAME"
-          
           PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILES_DIR"
           echo "$PROVISIONING_PROFILE" | tr -d '\r\n ' | base64 --decode > "$PROFILES_DIR/$PROV_UUID.mobileprovision"
 
       - name: Create Export Options
         script: |
-          # Criamos um plist minimalista. Ao usar 'manual' com o UUID, o Xcode localiza o certificado correto sozinho.
+          # Forçamos o 'signingCertificate' como 'Apple Distribution' no Plist
+          # Isso costuma matar o erro de 'No signing certificate iOS Distribution found'
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>app-store-connect</string>
+              <string>app-store</string>
               <key>teamID</key>
               <string>$TEAM_ID</string>
               <key>provisioningProfiles</key>
@@ -50,6 +46,8 @@ workflows:
               </dict>
               <key>signingStyle</key>
               <string>manual</string>
+              <key>signingCertificate</key>
+              <string>Apple Distribution</string>
               <key>manageAppVersionAndBuildNumber</key>
               <true/>
           </dict>
@@ -61,21 +59,19 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🧹 Limpando vestígios de identidades legadas..."
+          echo "🧹 Limpando ambiente..."
           chmod +x gradlew
           
-          # Remove qualquer menção a nomes de certificados fixos no projeto
+          # Remove identidades "hardcoded" que podem estar presas no arquivo do projeto
           find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY = ".*";/CODE_SIGN_IDENTITY = "";/g' {} +
-          find . -type f -name "project.pbxproj" -exec sed -i '' 's/CODE_SIGN_IDENTITY\[sdk=iphoneos\*\] = ".*";/CODE_SIGN_IDENTITY[sdk=iphoneos*] = "";/g' {} +
-
+          
           ./gradlew clean
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
           mkdir -p build/ios/logs
 
-          echo "🚀 Executando Archive com Identidade Explícita..."
-          # Passamos o CERT_NAME já no Archive para garantir consistência
+          echo "🚀 Executando Archive..."
           xcodebuild clean archive \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
@@ -86,20 +82,16 @@ workflows:
             CODE_SIGN_STYLE="Manual" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROV_UUID" \
-            CODE_SIGN_IDENTITY="$CERT_NAME" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
             -allowProvisioningOffline=YES | tee build/ios/logs/xcodebuild_raw_log.txt
 
-          echo "🛠️ Atualizando metadados do Archive..."
-          # Força o nome detectado dentro do arquivo gerado antes da exportação
-          /usr/libexec/PlistBuddy -c "Set :ApplicationProperties:SigningIdentity '$CERT_NAME'" build/ios/xcarchive/app.xcarchive/Info.plist
-
-          echo "📦 Gerando IPA final..."
-          # Aqui está o pulo do gato: usamos o nome detectado e removemos o erro de 'iOS Distribution'
+          echo "📦 Gerando IPA final (Exportando)..."
+          # Aqui passamos explicitamente 'Apple Distribution' para sobrescrever o default legacy
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
             -exportOptionsPlist "/Users/builder/export_options.plist" \
-            CODE_SIGN_IDENTITY="$CERT_NAME"
+            CODE_SIGN_IDENTITY="Apple Distribution"
 
     artifacts:
       - build/ios/ipa/*.ipa
