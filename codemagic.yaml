@@ -22,7 +22,7 @@ workflows:
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
           keychain add-certificates --certificate /tmp/certificate.p12 --certificate-password "$CERTIFICATE_PASSWORD"
 
-          # Detecta o nome real (ex: "Apple Distribution: Seu Nome")
+          # Detecta o nome real do certificado instalado (pode ser "Apple Distribution" ou "iOS Distribution")
           CERT_NAME=$(security find-identity -v -p codesigning | grep "Distribution" | head -1 | grep -o '".*"' | sed 's/"//g')
           echo "CERT_NAME=$CERT_NAME" >> $CM_ENV
           echo "✅ Certificado detectado: $CERT_NAME"
@@ -34,13 +34,14 @@ workflows:
 
       - name: Create Export Options
         script: |
+          # Usamos a variável CERT_NAME detectada para garantir que o nome esteja 100% correto
           cat > /Users/builder/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>app-store-connect</string>
+              <string>app-store</string>
               <key>teamID</key>
               <string>$TEAM_ID</string>
               <key>signingStyle</key>
@@ -68,7 +69,7 @@ workflows:
           ./gradlew clean
           rm -rf ~/Library/Developer/Xcode/DerivedData/*
 
-          # Forçamos o modo manual no projeto antes de começar
+          # Força o modo manual no projeto
           sed -i '' 's/CODE_SIGN_STYLE = .*/CODE_SIGN_STYLE = Manual;/g' "$XCODE_PROJECT/project.pbxproj"
 
           mkdir -p build/ios/xcarchive
@@ -88,12 +89,11 @@ workflows:
             -allowProvisioningOffline=YES
 
           echo "📦 Exportando IPA..."
-          # Aqui está o segredo: passamos o CERT_NAME detectado para o exportador não se perder
+          # Aqui removemos o CODE_SIGN_IDENTITY manual para o xcodebuild ler direto do Plist corrigido
           xcodebuild -exportArchive \
             -archivePath build/ios/xcarchive/app.xcarchive \
             -exportPath build/ios/ipa \
-            -exportOptionsPlist "/Users/builder/export_options.plist" \
-            CODE_SIGN_IDENTITY="$CERT_NAME"
+            -exportOptionsPlist "/Users/builder/export_options.plist"
 
     artifacts:
       - build/ios/ipa/*.ipa
