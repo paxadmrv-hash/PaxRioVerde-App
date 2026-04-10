@@ -1,6 +1,6 @@
 workflows:
   ios-workflow:
-    name: Pax Rio Verde iOS Final (Automated Signing)
+    name: Pax Rio Verde iOS Final (Automated)
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
@@ -10,6 +10,8 @@ workflows:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
+        # Defina uma senha qualquer para o certificado temporário
+        P12_PASSWORD: "pax_rioverde_automação"
 
     scripts:
       - name: Initialize Keychain
@@ -19,15 +21,18 @@ workflows:
 
       - name: Fetch Signing Files (App Store Connect)
         script: |
-          # Sem certificados antigos atrapalhando no portal, o --create vai gerar tudo novo
+          # Adicionamos a flag --p12-password para que o Codemagic 
+          # consiga criar o arquivo de chave privada localmente
           app-store-connect fetch-signing-files "$APP_ID" \
             --type IOS_APP_STORE \
             --create \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY"
+            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            --p12-password "$P12_PASSWORD"
           
-          keychain add-certificates
+          # Informamos ao keychain para usar a mesma senha ao importar
+          keychain add-certificates --p12-password "$P12_PASSWORD"
 
       - name: Set up code signing settings on Xcode project
         script: xcode-project use-profiles
@@ -37,14 +42,12 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🧹 Limpando ambiente..."
           chmod +x gradlew
           ./gradlew clean
           
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          echo "🚀 Compilando e assinando IPA da Pax Rio Verde..."
           xcode-project build-ipa \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
