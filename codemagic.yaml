@@ -10,8 +10,8 @@ workflows:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
-        # Defina uma senha qualquer para o certificado temporário
-        P12_PASSWORD: "pax_rioverde_automação"
+        # Definindo a senha como variável de ambiente para as ferramentas lerem
+        CERTIFICATE_PASSWORD: "pax_rioverde_pro"
 
     scripts:
       - name: Initialize Keychain
@@ -21,18 +21,20 @@ workflows:
 
       - name: Fetch Signing Files (App Store Connect)
         script: |
-          # Adicionamos a flag --p12-password para que o Codemagic 
-          # consiga criar o arquivo de chave privada localmente
+          # 1. Limpa qualquer certificado baixado anteriormente para evitar conflito
+          rm -rf /Users/builder/Library/Developer/Xcode/UserData/Certificates/*.p12
+          
+          # 2. Busca ou cria o certificado usando a senha correta
           app-store-connect fetch-signing-files "$APP_ID" \
             --type IOS_APP_STORE \
             --create \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
             --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
-            --p12-password "$P12_PASSWORD"
+            --p12-password "$CERTIFICATE_PASSWORD"
           
-          # Informamos ao keychain para usar a mesma senha ao importar
-          keychain add-certificates --p12-password "$P12_PASSWORD"
+          # 3. Adiciona os certificados ao chaveiro (sem a flag inválida)
+          keychain add-certificates
 
       - name: Set up code signing settings on Xcode project
         script: xcode-project use-profiles
@@ -57,4 +59,3 @@ workflows:
 
     artifacts:
       - build/ios/ipa/*.ipa
-      - build/ios/xcarchive/*.xcarchive
