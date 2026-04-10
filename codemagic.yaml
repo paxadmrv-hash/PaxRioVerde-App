@@ -19,15 +19,16 @@ workflows:
 
       - name: Fetch Signing Files (App Store Connect)
         script: |
-          # Passamos o APP_ID como argumento obrigatório e forçamos a criação com as chaves da API
+          # O uso da flag --certificate-key resolve o problema da chave privada ausente
           app-store-connect fetch-signing-files "$APP_ID" \
             --type IOS_APP_STORE \
             --create \
+            --certificate-key \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
             --private-key "$APP_STORE_CONNECT_PRIVATE_KEY"
           
-          # Instala os certificados gerados no chaveiro temporário do build
+          # Adiciona o certificado e a chave gerada ao keychain do build
           keychain add-certificates
 
       - name: Set up code signing settings on Xcode project
@@ -38,14 +39,14 @@ workflows:
           #!/usr/bin/env bash
           set -e -o pipefail
           
-          echo "🧹 Limpando ambiente e preparando Kotlin..."
+          echo "🧹 Limpando ambiente..."
           chmod +x gradlew
           ./gradlew clean
           
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          echo "🚀 Iniciando build do IPA assinado..."
+          echo "🚀 Gerando IPA assinado da Pax Rio Verde..."
           xcode-project build-ipa \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
