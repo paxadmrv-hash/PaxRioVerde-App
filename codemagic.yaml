@@ -10,7 +10,6 @@ workflows:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
-        # O keychain add-certificates busca automaticamente por esta variável:
         CERTIFICATE_PASSWORD: "pax_rioverde_pro"
 
     scripts:
@@ -19,27 +18,31 @@ workflows:
           keychain initialize
           keychain make-default
 
-      - name: Fetch Signing Files (App Store Connect)
+      - name: Fetch Signing Files (Force Creation)
         script: |
-          # 1. Limpeza rigorosa de arquivos temporários de builds anteriores
-          rm -rf /Users/builder/Library/Developer/Xcode/UserData/Certificates/*.p12
-          rm -rf /Users/builder/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision
-
-          # 2. Comando de busca/criação
-          # Removi a flag --certificate-key que causou erro e mantive apenas o essencial
+          # 1. Criamos pastas temporárias com permissão total
+          mkdir -p /tmp/certs
+          mkdir -p /tmp/profiles
+          
+          # 2. Comando ajustado: 
+          # --certificate-key: Passamos um caminho para ele SALVAR a nova chave privada gerada
           app-store-connect fetch-signing-files "$APP_ID" \
             --type IOS_APP_STORE \
+            --platform IOS \
             --create \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
             --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
-            --p12-password "$CERTIFICATE_PASSWORD"
+            --certificate-key /tmp/certs/new_service.key \
+            --p12-password "$CERTIFICATE_PASSWORD" \
+            --certificates-dir /tmp/certs \
+            --profiles-dir /tmp/profiles
           
-          # 3. Importação (Sem flags extras, ele usará a variável CERTIFICATE_PASSWORD acima)
-          keychain add-certificates
+          # 3. Importação apontando para a pasta onde forçamos o download
+          keychain add-certificates --certificates-dir /tmp/certs
 
       - name: Set up code signing settings on Xcode project
-        script: xcode-project use-profiles
+        script: xcode-project use-profiles --profiles-dir /tmp/profiles
 
       - name: Build and Sign IPA
         script: |
