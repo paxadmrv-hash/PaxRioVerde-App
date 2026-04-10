@@ -10,7 +10,7 @@ workflows:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
-        # Definindo a senha como variável de ambiente para as ferramentas lerem
+        # O keychain add-certificates busca automaticamente por esta variável:
         CERTIFICATE_PASSWORD: "pax_rioverde_pro"
 
     scripts:
@@ -21,10 +21,12 @@ workflows:
 
       - name: Fetch Signing Files (App Store Connect)
         script: |
-          # 1. Limpa qualquer certificado baixado anteriormente para evitar conflito
+          # 1. Limpeza rigorosa de arquivos temporários de builds anteriores
           rm -rf /Users/builder/Library/Developer/Xcode/UserData/Certificates/*.p12
-          
-          # 2. Busca ou cria o certificado usando a senha correta
+          rm -rf /Users/builder/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision
+
+          # 2. Comando de busca/criação
+          # Removi a flag --certificate-key que causou erro e mantive apenas o essencial
           app-store-connect fetch-signing-files "$APP_ID" \
             --type IOS_APP_STORE \
             --create \
@@ -33,7 +35,7 @@ workflows:
             --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
             --p12-password "$CERTIFICATE_PASSWORD"
           
-          # 3. Adiciona os certificados ao chaveiro (sem a flag inválida)
+          # 3. Importação (Sem flags extras, ele usará a variável CERTIFICATE_PASSWORD acima)
           keychain add-certificates
 
       - name: Set up code signing settings on Xcode project
