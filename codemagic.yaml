@@ -10,6 +10,7 @@ workflows:
         XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
         XCODE_SCHEME: "iosApp"
         APP_ID: "br.com.paxrioverde.app"
+        # O Codemagic usa esta variável automaticamente para proteger o P12
         CERTIFICATE_PASSWORD: "pax_rioverde_pro"
 
     scripts:
@@ -18,31 +19,24 @@ workflows:
           keychain initialize
           keychain make-default
 
-      - name: Fetch Signing Files (Force Creation)
+      - name: Fetch Signing Files
         script: |
-          # 1. Criamos pastas temporárias com permissão total
-          mkdir -p /tmp/certs
-          mkdir -p /tmp/profiles
-          
-          # 2. Comando ajustado: 
-          # --certificate-key: Passamos um caminho para ele SALVAR a nova chave privada gerada
+          # 1. Comando limpo: o APP_ID deve ir no final sem flags antes dele
+          # 2. --create vai gerar o certificado se o portal estiver limpo
+          # 3. --p12-password vincula a senha que definimos nas vars
           app-store-connect fetch-signing-files "$APP_ID" \
             --type IOS_APP_STORE \
-            --platform IOS \
             --create \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
             --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
-            --certificate-key /tmp/certs/new_service.key \
-            --p12-password "$CERTIFICATE_PASSWORD" \
-            --certificates-dir /tmp/certs \
-            --profiles-dir /tmp/profiles
+            --p12-password "$CERTIFICATE_PASSWORD"
           
-          # 3. Importação apontando para a pasta onde forçamos o download
-          keychain add-certificates --certificates-dir /tmp/certs
+          # 4. O comando add-certificates sem flags busca nos caminhos padrão
+          keychain add-certificates
 
       - name: Set up code signing settings on Xcode project
-        script: xcode-project use-profiles --profiles-dir /tmp/profiles
+        script: xcode-project use-profiles
 
       - name: Build and Sign IPA
         script: |
@@ -55,6 +49,7 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
+          echo "🚀 Iniciando build final para Pax Rio Verde..."
           xcode-project build-ipa \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
