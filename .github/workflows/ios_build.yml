@@ -5,7 +5,7 @@ on:
     branches: [ main, master ]
 
 env:
-  # Isso remove o aviso de depreciação do Node.js 20
+  # Remove o aviso de depreciação do Node.js 20
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -35,8 +35,8 @@ jobs:
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           
-          # Importa usando aspas simples para proteger a senha
-          security import certificate.p12 -k build.keychain -P '$P12_PASSWORD' -T /usr/bin/codesign
+          # Importa usando aspas duplas para resolver o erro "wrong password"
+          security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
       - name: Install Provisioning Profile
