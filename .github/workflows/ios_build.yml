@@ -14,21 +14,22 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
       - name: Install Apple Certificate
         env:
           P12_CERTIFICATE: ${{ secrets.P12_CERTIFICATE }}
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Decodifica o certificado P12
           printf '%s' "$P12_CERTIFICATE" | base64 --decode > certificate.p12
-          
-          # Configura o Keychain do macOS
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          
-          # Importa o certificado
           security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign -f pkcs12
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
@@ -37,38 +38,39 @@ jobs:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          
-          # Caminho onde o arquivo foi subido
           GPG_FILE="iosApp/Pax_Rio_Verde.mobileprovision.gpg"
           
-          if [ ! -f "$GPG_FILE" ]; then
-            echo "ERRO: O arquivo criptografado não foi encontrado em $GPG_FILE"
-            exit 1
-          fi
-
-          # 1. Descriptografa o arquivo
           gpg --quiet --batch --yes --decrypt --passphrase "$GPG_PASSPHRASE" \
           --output temp.mobileprovision "$GPG_FILE"
 
-          # 2. Extrai o UUID ignorando os caracteres binários da assinatura Apple
-          # Usamos 'strings' para limpar o lixo binário e 'grep' com regex para o padrão do UUID
           UUID=$(strings temp.mobileprovision | grep -A 1 "UUID" | grep -oE "[a-fA-F0-9]{8}-([a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}" | head -n 1 || echo "FALHA")
 
           if [ "$UUID" == "FALHA" ]; then
-            echo "ERRO: Não foi possível encontrar o UUID no arquivo descriptografado."
+            echo "ERRO: Não foi possível encontrar o UUID."
             exit 1
           fi
 
-          # 3. Instala o perfil com o nome que o Xcode exige (UUID.mobileprovision)
           cp temp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
-          
-          # Exporta para os próximos passos
           echo "PROVISIONING_PROFILE_UUID=$UUID" >> $GITHUB_ENV
-          echo "Sucesso! UUID detectado: $UUID"
+          echo "UUID detectado: $UUID"
+
+      - name: Setup Gradle and Java for Xcode KMP
+        run: |
+          # Garante que o Gradle tenha permissão de execução
+          chmod +x gradlew
+          
+          # Cria um link para o Java onde o Xcode consiga encontrar nativamente
+          sudo ln -sfn $JAVA_HOME/bin/java /usr/local/bin/java
+          
+          # Verifica se o Java está acessível
+          java -version
 
       - name: Build iOS Archive
         run: |
-          # Build usando o projeto localizado na pasta iosApp
+          # Exporta o JAVA_HOME explicitamente para o processo do xcodebuild
+          export JAVA_HOME=$JAVA_HOME
+          export PATH=$PATH:$JAVA_HOME/bin
+          
           xcodebuild -project iosApp/iosApp.xcodeproj \
             -scheme iosApp \
             -sdk iphoneos \
@@ -82,7 +84,6 @@ jobs:
 
       - name: Export IPA
         run: |
-          # Gera o arquivo de configuração para exportação via App Store
           echo '<?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
