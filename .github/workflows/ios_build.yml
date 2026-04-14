@@ -26,15 +26,19 @@ jobs:
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Limpeza agressiva de espaços e quebras de linha
+          # Decodifica removendo lixo de caracteres do Windows
           echo "$P12_CERTIFICATE" | tr -d '\r\n ' | base64 --decode > certificate.p12
+          
+          # Verifica se o arquivo tem conteúdo
+          ls -lh certificate.p12
           
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           
-          # Importa forçando o formato pkcs12 para evitar erro de MAC
+          # Importa usando aspas simples para proteger a senha
           security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign -f pkcs12
+          
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
       - name: Install Provisioning Profile
@@ -44,15 +48,21 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo "$MOBILEPROVISION" | tr -d '\r\n ' | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision
           
-          # Extrai o UUID f83a914d...
-          UUID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision | grep -aA1 "UUID" | grep -o "[-A-Z0-9]\{36\}")
+          # Tenta extrair o UUID. Se falhar, o script avisa o porquê.
+          UUID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision | grep -aA1 "UUID" | grep -o "[-A-Z0-9]\{36\}" || echo "FALHA")
+          
+          if [ "$UUID" == "FALHA" ]; then
+            echo "ERRO CRÍTICO: O arquivo decodificado não é um perfil válido ou o Base64 está corrompido."
+            exit 1
+          fi
           
           cp ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
           echo "PROVISIONING_PROFILE_UUID=$UUID" >> $GITHUB_ENV
+          echo "UUID detectado: $UUID"
 
       - name: Build iOS Archive
         run: |
-          # Build usando o .xcodeproj detectado
+          # Ajustado para o seu projeto KMP
           xcodebuild -project iosApp/iosApp.xcodeproj \
             -scheme iosApp \
             -sdk iphoneos \
