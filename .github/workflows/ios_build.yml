@@ -38,37 +38,31 @@ jobs:
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           
-          # Caminho exato onde o arquivo foi subido
+          # Caminho onde o arquivo foi subido
           GPG_FILE="iosApp/Pax_Rio_Verde.mobileprovision.gpg"
           
           if [ ! -f "$GPG_FILE" ]; then
             echo "ERRO: O arquivo criptografado não foi encontrado em $GPG_FILE"
-            ls -R
             exit 1
           fi
 
-          # 1. Tenta descriptografar
+          # 1. Descriptografa o arquivo
           gpg --quiet --batch --yes --decrypt --passphrase "$GPG_PASSPHRASE" \
           --output temp.mobileprovision "$GPG_FILE"
 
-          # 2. Verifica se o arquivo descriptografado tem conteúdo
-          if [ ! -s temp.mobileprovision ]; then
-            echo "ERRO: O arquivo descriptografado está vazio. Verifique se a senha GPG_PASSPHRASE está correta."
-            exit 1
-          fi
-
-          # 3. Tenta extrair o UUID (Necessário para o Xcode)
-          UUID=$(security cms -D -i temp.mobileprovision | grep -aA1 "UUID" | grep -o "[-A-Z0-9]\{36\}" || echo "FALHA")
+          # 2. Extrai o UUID ignorando os caracteres binários da assinatura Apple
+          # Usamos 'strings' para limpar o lixo binário e 'grep' com regex para o padrão do UUID
+          UUID=$(strings temp.mobileprovision | grep -A 1 "UUID" | grep -oE "[a-fA-F0-9]{8}-([a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}" | head -n 1 || echo "FALHA")
 
           if [ "$UUID" == "FALHA" ]; then
-            echo "ERRO: O arquivo descriptografado não é um perfil válido da Apple."
-            echo "Abaixo estão os primeiros bytes do arquivo para diagnóstico (se aparecerem caracteres estranhos, o arquivo original está corrompido):"
-            head -c 200 temp.mobileprovision
+            echo "ERRO: Não foi possível encontrar o UUID no arquivo descriptografado."
             exit 1
           fi
 
-          # 4. Instala o perfil no local correto
+          # 3. Instala o perfil com o nome que o Xcode exige (UUID.mobileprovision)
           cp temp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
+          
+          # Exporta para os próximos passos
           echo "PROVISIONING_PROFILE_UUID=$UUID" >> $GITHUB_ENV
           echo "Sucesso! UUID detectado: $UUID"
 
