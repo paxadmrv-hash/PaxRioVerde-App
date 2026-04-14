@@ -26,14 +26,14 @@ jobs:
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Limpa quebras de linha que o Windows/PowerShell costumam inserir
-          echo "$P12_CERTIFICATE" | tr -d '\r\n ' | base64 --decode > certificate.p12
+          # Decodifica o certificado removendo qualquer quebra de linha do Windows
+          printf '%s' "$P12_CERTIFICATE" | sed 's/[[:space:]]//g' | base64 --decode > certificate.p12
           
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           
-          # Importa forçando o formato pkcs12 para evitar erro de MAC
+          # Importa o certificado para o Keychain do macOS
           security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign -f pkcs12
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
@@ -43,24 +43,25 @@ jobs:
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           
-          # Decodifica removendo qualquer caractere invisível
-          echo "$MOBILEPROVISION" | tr -d '\r\n ' | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision
+          # Decodifica o Perfil usando printf para suportar strings muito longas
+          printf '%s' "$MOBILEPROVISION" | sed 's/[[:space:]]//g' | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision
           
-          # Extrai o UUID necessário (f83a914d-202a-436e-9e51-257ae86fccd0)
+          # Tenta extrair o UUID real do arquivo gerado
           UUID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision | grep -aA1 "UUID" | grep -o "[-A-Z0-9]\{36\}" || echo "FALHA")
           
           if [ "$UUID" == "FALHA" ]; then
-            echo "ERRO CRÍTICO: Não foi possível ler o UUID do perfil. Verifique o Base64."
+            echo "ERRO CRÍTICO: O arquivo decodificado não é um perfil válido. Verifique se o Secret está completo."
             exit 1
           fi
           
+          # Nomeia o arquivo com o UUID correto para o Xcode localizar
           cp ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
           echo "PROVISIONING_PROFILE_UUID=$UUID" >> $GITHUB_ENV
           echo "UUID detectado: $UUID"
 
       - name: Build iOS Archive
         run: |
-          # Usando o caminho detectado iosApp/iosApp.xcodeproj em vez de workspace
+          # Executa o build usando o seu arquivo .xcodeproj específico
           xcodebuild -project iosApp/iosApp.xcodeproj \
             -scheme iosApp \
             -sdk iphoneos \
@@ -74,7 +75,7 @@ jobs:
 
       - name: Export IPA
         run: |
-          # Configurações de exportação para App Store e o Team ID do seu projeto
+          # Cria o arquivo de configuração para a exportação
           echo '<?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
