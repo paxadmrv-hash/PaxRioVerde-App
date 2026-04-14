@@ -20,43 +20,29 @@ jobs:
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Usando um método de decodificação mais simples para o certificado
-          echo "$P12_CERTIFICATE" | base64 --decode > certificate.p12 || printf '%s' "$P12_CERTIFICATE" > certificate.p12
-          
+          printf '%s' "$P12_CERTIFICATE" | base64 --decode > certificate.p12
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign -f pkcs12
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
-      - name: Install Provisioning Profile
+      - name: Decrypt and Install Provisioning Profile
         env:
-          MOBILEPROVISION_RAW: ${{ secrets.MOBILEPROVISION }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           
-          # Salva o conteúdo bruto direto em um arquivo
-          printf '%s' "$MOBILEPROVISION_RAW" > ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision
+          # Descriptografa o arquivo que você subiu para o repositório
+          gpg --quiet --batch --yes --decrypt --passphrase "$GPG_PASSPHRASE" \
+          --output ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision Pax_Rio_Verde.mobileprovision.gpg
           
-          # Tenta ler o UUID. Se o arquivo estiver em Base64 ou Bruto, o 'security' vai tentar processar
-          UUID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision | grep -aA1 "UUID" | grep -o "[-A-Z0-9]\{36\}" || echo "FALHA")
-          
-          # Se falhou, pode ser porque o segredo está em Base64, então tentamos decodificar
-          if [ "$UUID" == "FALHA" ]; then
-            echo "Tentando decodificação Base64..."
-            base64 --decode ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision > ~/Library/MobileDevice/Provisioning\ Profiles/temp_decoded.mobileprovision
-            UUID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/temp_decoded.mobileprovision | grep -aA1 "UUID" | grep -o "[-A-Z0-9]\{36\}" || echo "FALHA")
-            mv ~/Library/MobileDevice/Provisioning\ Profiles/temp_decoded.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision
-          fi
-
-          if [ "$UUID" == "FALHA" ]; then
-            echo "ERRO: O arquivo fornecido no Secret não é um perfil válido (Bruto ou Base64)."
-            exit 1
-          fi
+          # Extrai o UUID real
+          UUID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision | grep -aA1 "UUID" | grep -o "[-A-Z0-9]\{36\}")
           
           cp ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
           echo "PROVISIONING_PROFILE_UUID=$UUID" >> $GITHUB_ENV
-          echo "UUID detectado com sucesso: $UUID"
+          echo "UUID detectado: $UUID"
 
       - name: Build iOS Archive
         run: |
