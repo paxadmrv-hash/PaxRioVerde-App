@@ -20,10 +20,15 @@ jobs:
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
+          # Decodifica o certificado P12
           printf '%s' "$P12_CERTIFICATE" | base64 --decode > certificate.p12
+          
+          # Configura o Keychain do macOS
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          
+          # Importa o certificado
           security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign -f pkcs12
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
@@ -33,31 +38,43 @@ jobs:
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           
-          # Caminho exato baseado na sua imagem image_702693.png
+          # Caminho exato onde o arquivo foi subido
           GPG_FILE="iosApp/Pax_Rio_Verde.mobileprovision.gpg"
           
           if [ ! -f "$GPG_FILE" ]; then
-            echo "ERRO: Arquivo não encontrado em $GPG_FILE. Verificando pastas..."
+            echo "ERRO: O arquivo criptografado não foi encontrado em $GPG_FILE"
             ls -R
             exit 1
           fi
 
-          # Descriptografa o arquivo
+          # 1. Tenta descriptografar
           gpg --quiet --batch --yes --decrypt --passphrase "$GPG_PASSPHRASE" \
-          --output ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision "$GPG_FILE"
-          
-          # Extrai o UUID real (necessário para o xcodebuild)
-          UUID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision | grep -aA1 "UUID" | grep -o "[-A-Z0-9]\{36\}")
-          
-          # Renomeia para o formato que o macOS exige
-          cp ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
-          
+          --output temp.mobileprovision "$GPG_FILE"
+
+          # 2. Verifica se o arquivo descriptografado tem conteúdo
+          if [ ! -s temp.mobileprovision ]; then
+            echo "ERRO: O arquivo descriptografado está vazio. Verifique se a senha GPG_PASSPHRASE está correta."
+            exit 1
+          fi
+
+          # 3. Tenta extrair o UUID (Necessário para o Xcode)
+          UUID=$(security cms -D -i temp.mobileprovision | grep -aA1 "UUID" | grep -o "[-A-Z0-9]\{36\}" || echo "FALHA")
+
+          if [ "$UUID" == "FALHA" ]; then
+            echo "ERRO: O arquivo descriptografado não é um perfil válido da Apple."
+            echo "Abaixo estão os primeiros bytes do arquivo para diagnóstico (se aparecerem caracteres estranhos, o arquivo original está corrompido):"
+            head -c 200 temp.mobileprovision
+            exit 1
+          fi
+
+          # 4. Instala o perfil no local correto
+          cp temp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
           echo "PROVISIONING_PROFILE_UUID=$UUID" >> $GITHUB_ENV
           echo "Sucesso! UUID detectado: $UUID"
 
       - name: Build iOS Archive
         run: |
-          # Build usando o projeto dentro da pasta iosApp
+          # Build usando o projeto localizado na pasta iosApp
           xcodebuild -project iosApp/iosApp.xcodeproj \
             -scheme iosApp \
             -sdk iphoneos \
@@ -71,6 +88,7 @@ jobs:
 
       - name: Export IPA
         run: |
+          # Gera o arquivo de configuração para exportação via App Store
           echo '<?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
