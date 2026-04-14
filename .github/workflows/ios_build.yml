@@ -19,6 +19,7 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+          cache: 'gradle'
 
       - name: Install Apple Certificate
         env:
@@ -54,20 +55,19 @@ jobs:
           echo "PROVISIONING_PROFILE_UUID=$UUID" >> $GITHUB_ENV
           echo "UUID detectado: $UUID"
 
-      - name: Setup Gradle and Java for Xcode KMP
+      - name: Setup KMP Environment
         run: |
-          # Garante que o Gradle tenha permissão de execução
+          # Permissão para o Gradle
           chmod +x gradlew
           
-          # Cria um link para o Java onde o Xcode consiga encontrar nativamente
+          # Link do Java para o Xcode
           sudo ln -sfn $JAVA_HOME/bin/java /usr/local/bin/java
           
-          # Verifica se o Java está acessível
-          java -version
+          # Pré-compila o framework Kotlin para evitar que o Xcode dê timeout
+          ./gradlew :shared:linkReleaseFrameworkIosArm64
 
       - name: Build iOS Archive
         run: |
-          # Exporta o JAVA_HOME explicitamente para o processo do xcodebuild
           export JAVA_HOME=$JAVA_HOME
           export PATH=$PATH:$JAVA_HOME/bin
           
