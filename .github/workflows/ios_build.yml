@@ -26,19 +26,15 @@ jobs:
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Decodifica removendo lixo de caracteres do Windows
+          # Limpa quebras de linha que o Windows/PowerShell costumam inserir
           echo "$P12_CERTIFICATE" | tr -d '\r\n ' | base64 --decode > certificate.p12
-          
-          # Verifica se o arquivo tem conteúdo
-          ls -lh certificate.p12
           
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           
-          # Importa usando aspas simples para proteger a senha
+          # Importa forçando o formato pkcs12 para evitar erro de MAC
           security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign -f pkcs12
-          
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
       - name: Install Provisioning Profile
@@ -46,13 +42,15 @@ jobs:
           MOBILEPROVISION: ${{ secrets.MOBILEPROVISION }}
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          
+          # Decodifica removendo qualquer caractere invisível
           echo "$MOBILEPROVISION" | tr -d '\r\n ' | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision
           
-          # Tenta extrair o UUID. Se falhar, o script avisa o porquê.
+          # Extrai o UUID necessário (f83a914d-202a-436e-9e51-257ae86fccd0)
           UUID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision | grep -aA1 "UUID" | grep -o "[-A-Z0-9]\{36\}" || echo "FALHA")
           
           if [ "$UUID" == "FALHA" ]; then
-            echo "ERRO CRÍTICO: O arquivo decodificado não é um perfil válido ou o Base64 está corrompido."
+            echo "ERRO CRÍTICO: Não foi possível ler o UUID do perfil. Verifique o Base64."
             exit 1
           fi
           
@@ -62,7 +60,7 @@ jobs:
 
       - name: Build iOS Archive
         run: |
-          # Ajustado para o seu projeto KMP
+          # Usando o caminho detectado iosApp/iosApp.xcodeproj em vez de workspace
           xcodebuild -project iosApp/iosApp.xcodeproj \
             -scheme iosApp \
             -sdk iphoneos \
@@ -76,6 +74,7 @@ jobs:
 
       - name: Export IPA
         run: |
+          # Configurações de exportação para App Store e o Team ID do seu projeto
           echo '<?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
