@@ -5,7 +5,6 @@ on:
     branches: [ main, master ]
 
 env:
-  # Remove o aviso de depreciação do Node.js 20
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -27,15 +26,10 @@ jobs:
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Decodifica o certificado
           echo "$P12_CERTIFICATE" | base64 --decode > certificate.p12
-          
-          # Cria e configura o chaveiro temporário
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          
-          # Importa usando aspas duplas para resolver o erro "wrong password"
           security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
@@ -46,13 +40,40 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo "$MOBILEPROVISION" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
 
-      - name: Build with Gradle
+      - name: Build iOS Archive
         run: |
-          chmod +x ./gradlew
-          ./gradlew :shared:assembleRelease 
+          # O xcodebuild vai chamar o Gradle (composeApp) automaticamente
+          xcodebuild -workspace iosApp/iosApp.xcworkspace \
+            -scheme iosApp \
+            -sdk iphoneos \
+            -configuration Release \
+            archive -archivePath $PWD/build/PaxRioVerde.xcarchive \
+            ALLOW_PROVISIONING_DEVICE_REGISTRATION=NO \
+            ALLOW_PROVISIONING_UPDATES=NO
+
+      - name: Export IPA
+        run: |
+          # Cria um arquivo de configuração temporário para a exportação
+          echo '<?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>teamID</key>
+              <string>SEU_TEAM_ID_AQUI</string>
+              <key>compileBitcode</key>
+              <false/>
+          </dict>
+          </plist>' > ExportOptions.plist
+
+          xcodebuild -exportArchive \
+            -archivePath $PWD/build/PaxRioVerde.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath $PWD/build/ipa
 
       - name: Archive artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ios-build-output
-          path: build/ios/ipa/*.ipa
+          path: build/ipa/*.ipa
