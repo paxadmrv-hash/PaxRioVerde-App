@@ -104,9 +104,10 @@ jobs:
           API_KEY_CONTENT: ${{ secrets.APP_STORE_API_KEY_CONTENT }}
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
-          # O printf abaixo é crucial para evitar o erro de autenticação Code=-26000
-          printf -- "%s" "$API_KEY_CONTENT" > ~/.appstoreconnect/private_keys/AuthKey_$API_KEY_ID.p8
+          # Preservando as quebras de linha da chave privada
+          printf "%s" "$API_KEY_CONTENT" > ~/.appstoreconnect/private_keys/AuthKey_$API_KEY_ID.p8
           
+          # Tentativa de upload usando o caminho exato do arquivo exportado
           xcrun altool --upload-app \
             -f build/ipa/*.ipa \
             -t ios \
