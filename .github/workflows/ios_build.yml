@@ -32,48 +32,43 @@ jobs:
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign -f pkcs12
+          
+          # COMANDO CRUCIAL PARA NÃO TRAVAR NO CODESIGN:
+          # Isso permite que o codesign use a chave sem um prompt de interface gráfica
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
 
       - name: Decrypt and Install Provisioning Profile
         env:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          
-          # O arquivo está em iosApp/Pax_Rio_Verde.mobileprovision.gpg conforme sua imagem
           GPG_FILE="iosApp/Pax_Rio_Verde.mobileprovision.gpg"
           
-          # Descriptografa
           gpg --quiet --batch --yes --decrypt --passphrase "$GPG_PASSPHRASE" \
           --output temp.mobileprovision "$GPG_FILE"
 
-          # Extrai o UUID necessário para o Xcode
           UUID=$(strings temp.mobileprovision | grep -A 1 "UUID" | grep -oE "[a-fA-F0-9]{8}-([a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}" | head -n 1 || echo "FALHA")
 
           if [ "$UUID" == "FALHA" ]; then
-            echo "ERRO: Não foi possível encontrar o UUID no arquivo."
+            echo "ERRO: UUID não encontrado."
             exit 1
           fi
 
-          # Instala o perfil
           cp temp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
           echo "PROVISIONING_PROFILE_UUID=$UUID" >> $GITHUB_ENV
-          echo "Sucesso! UUID detectado: $UUID"
 
       - name: Setup KMP Environment
         run: |
           chmod +x gradlew
           sudo ln -sfn $JAVA_HOME/bin/java /usr/local/bin/java
-          
-          # Compila o Kotlin primeiro para garantir que o framework esteja pronto
-          ./gradlew assembleRelease
+          ./gradlew clean assembleRelease
 
       - name: Build iOS Archive
         run: |
           export JAVA_HOME=$JAVA_HOME
           export PATH=$PATH:$JAVA_HOME/bin
           
-          # Executa o build dentro do diretório iosApp onde está o .xcodeproj
           xcodebuild -project iosApp/iosApp.xcodeproj \
             -scheme iosApp \
             -sdk iphoneos \
@@ -87,7 +82,6 @@ jobs:
 
       - name: Export IPA
         run: |
-          # Configurações de exportação
           echo '<?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -96,6 +90,8 @@ jobs:
               <string>app-store</string>
               <key>teamID</key>
               <string>264TWUW2L6</string>
+              <key>uploadSymbols</key>
+              <false/>
               <key>compileBitcode</key>
               <false/>
               <key>signingStyle</key>
@@ -111,7 +107,8 @@ jobs:
           xcodebuild -exportArchive \
             -archivePath $PWD/build/PaxRioVerde.xcarchive \
             -exportOptionsPlist ExportOptions.plist \
-            -exportPath $PWD/build/ipa
+            -exportPath $PWD/build/ipa \
+            -allowProvisioningUpdates NO
 
       - name: Archive artifacts
         uses: actions/upload-artifact@v4
