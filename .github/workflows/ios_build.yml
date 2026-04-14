@@ -33,19 +33,31 @@ jobs:
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           
-          # Descriptografa o arquivo que você subiu para o repositório
-          gpg --quiet --batch --yes --decrypt --passphrase "$GPG_PASSPHRASE" \
-          --output ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision Pax_Rio_Verde.mobileprovision.gpg
+          # Caminho exato baseado na sua imagem image_702693.png
+          GPG_FILE="iosApp/Pax_Rio_Verde.mobileprovision.gpg"
           
-          # Extrai o UUID real
+          if [ ! -f "$GPG_FILE" ]; then
+            echo "ERRO: Arquivo não encontrado em $GPG_FILE. Verificando pastas..."
+            ls -R
+            exit 1
+          fi
+
+          # Descriptografa o arquivo
+          gpg --quiet --batch --yes --decrypt --passphrase "$GPG_PASSPHRASE" \
+          --output ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision "$GPG_FILE"
+          
+          # Extrai o UUID real (necessário para o xcodebuild)
           UUID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision | grep -aA1 "UUID" | grep -o "[-A-Z0-9]\{36\}")
           
+          # Renomeia para o formato que o macOS exige
           cp ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
+          
           echo "PROVISIONING_PROFILE_UUID=$UUID" >> $GITHUB_ENV
-          echo "UUID detectado: $UUID"
+          echo "Sucesso! UUID detectado: $UUID"
 
       - name: Build iOS Archive
         run: |
+          # Build usando o projeto dentro da pasta iosApp
           xcodebuild -project iosApp/iosApp.xcodeproj \
             -scheme iosApp \
             -sdk iphoneos \
