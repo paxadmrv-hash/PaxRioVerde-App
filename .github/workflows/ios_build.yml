@@ -1,4 +1,4 @@
-name: iOS Build Pax Rio Verde
+name: iOS Build and Deploy Pax Rio Verde
 
 on:
   push:
@@ -32,9 +32,6 @@ jobs:
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign -f pkcs12
-          
-          # COMANDO CRUCIAL PARA NÃO TRAVAR NO CODESIGN:
-          # Isso permite que o codesign use a chave sem um prompt de interface gráfica
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
           security set-keychain-settings -lut 21600 build.keychain
 
@@ -44,17 +41,8 @@ jobs:
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           GPG_FILE="iosApp/Pax_Rio_Verde.mobileprovision.gpg"
-          
-          gpg --quiet --batch --yes --decrypt --passphrase "$GPG_PASSPHRASE" \
-          --output temp.mobileprovision "$GPG_FILE"
-
-          UUID=$(strings temp.mobileprovision | grep -A 1 "UUID" | grep -oE "[a-fA-F0-9]{8}-([a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}" | head -n 1 || echo "FALHA")
-
-          if [ "$UUID" == "FALHA" ]; then
-            echo "ERRO: UUID não encontrado."
-            exit 1
-          fi
-
+          gpg --quiet --batch --yes --decrypt --passphrase "$GPG_PASSPHRASE" --output temp.mobileprovision "$GPG_FILE"
+          UUID=$(strings temp.mobileprovision | grep -A 1 "UUID" | grep -oE "[a-fA-F0-9]{8}-([a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}" | head -n 1)
           cp temp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
           echo "PROVISIONING_PROFILE_UUID=$UUID" >> $GITHUB_ENV
 
@@ -68,7 +56,6 @@ jobs:
         run: |
           export JAVA_HOME=$JAVA_HOME
           export PATH=$PATH:$JAVA_HOME/bin
-          
           xcodebuild -project iosApp/iosApp.xcodeproj \
             -scheme iosApp \
             -sdk iphoneos \
@@ -110,7 +97,23 @@ jobs:
             -exportPath $PWD/build/ipa \
             -allowProvisioningUpdates NO
 
-      - name: Archive artifacts
+      - name: Upload to App Store Connect (The "No-Mac" Solution)
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_API_ISSUER_ID }}
+          API_KEY_CONTENT: ${{ secrets.APP_STORE_API_KEY_CONTENT }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$API_KEY_CONTENT" > ~/.appstoreconnect/private_keys/AuthKey_$API_KEY_ID.p8
+          
+          # Envia o arquivo IPA diretamente para a Apple
+          xcrun altool --upload-app \
+            -f build/ipa/*.ipa \
+            -t ios \
+            --apiKey "$API_KEY_ID" \
+            --apiIssuer "$API_ISSUER_ID"
+
+      - name: Archive artifacts (Backup download)
         uses: actions/upload-artifact@v4
         with:
           name: ios-build-output
