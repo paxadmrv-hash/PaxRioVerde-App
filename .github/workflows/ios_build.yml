@@ -97,23 +97,24 @@ jobs:
             -exportPath $PWD/build/ipa \
             -allowProvisioningUpdates NO
 
-      - name: Upload to App Store Connect (The "No-Mac" Solution)
+      - name: Upload to App Store Connect
         env:
           API_KEY_ID: ${{ secrets.APP_STORE_API_KEY_ID }}
           API_ISSUER_ID: ${{ secrets.APP_STORE_API_ISSUER_ID }}
           API_KEY_CONTENT: ${{ secrets.APP_STORE_API_KEY_CONTENT }}
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
-          echo "$API_KEY_CONTENT" > ~/.appstoreconnect/private_keys/AuthKey_$API_KEY_ID.p8
+          # O printf abaixo é crucial para evitar o erro de autenticação Code=-26000
+          printf -- "%s" "$API_KEY_CONTENT" > ~/.appstoreconnect/private_keys/AuthKey_$API_KEY_ID.p8
           
-          # Envia o arquivo IPA diretamente para a Apple
           xcrun altool --upload-app \
             -f build/ipa/*.ipa \
             -t ios \
             --apiKey "$API_KEY_ID" \
-            --apiIssuer "$API_ISSUER_ID"
+            --apiIssuer "$API_ISSUER_ID" \
+            --verbose
 
-      - name: Archive artifacts (Backup download)
+      - name: Archive artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ios-build-output
