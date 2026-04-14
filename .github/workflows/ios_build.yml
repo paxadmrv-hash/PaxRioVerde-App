@@ -49,13 +49,10 @@ jobs:
       - name: Setup KMP Environment
         run: |
           chmod +x gradlew
-          sudo ln -sfn $JAVA_HOME/bin/java /usr/local/bin/java
           ./gradlew clean assembleRelease
 
       - name: Build iOS Archive
         run: |
-          export JAVA_HOME=$JAVA_HOME
-          export PATH=$PATH:$JAVA_HOME/bin
           xcodebuild -project iosApp/iosApp.xcodeproj \
             -scheme iosApp \
             -sdk iphoneos \
@@ -104,10 +101,11 @@ jobs:
           API_KEY_CONTENT: ${{ secrets.APP_STORE_API_KEY_CONTENT }}
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
-          # Preservando as quebras de linha da chave privada
-          printf "%s" "$API_KEY_CONTENT" > ~/.appstoreconnect/private_keys/AuthKey_$API_KEY_ID.p8
+          # O uso de EOF garante a preservação exata do formato da chave p8
+          cat <<EOF > ~/.appstoreconnect/private_keys/AuthKey_$API_KEY_ID.p8
+          $API_KEY_CONTENT
+          EOF
           
-          # Tentativa de upload usando o caminho exato do arquivo exportado
           xcrun altool --upload-app \
             -f build/ipa/*.ipa \
             -t ios \
