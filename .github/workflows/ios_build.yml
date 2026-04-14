@@ -5,7 +5,7 @@ on:
     branches: [ main, master ]
 
 env:
-  # Remove o aviso de depreciação do Node.js 20
+  # Garante compatibilidade com as versões mais recentes das Actions
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -27,15 +27,11 @@ jobs:
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Decodifica o certificado p12 legado
+          # Decodifica e importa o certificado P12
           echo "$P12_CERTIFICATE" | base64 --decode > certificate.p12
-          
-          # Configura o chaveiro temporário no macOS do GitHub
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          
-          # Importa o certificado (usa aspas duplas para evitar erro de senha)
           security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
@@ -43,24 +39,32 @@ jobs:
         env:
           MOBILEPROVISION: ${{ secrets.MOBILEPROVISION }}
         run: |
+          # Cria a pasta e decodifica o perfil
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          # O nome do arquivo dentro da pasta deve ser o UUID ou um nome fixo que o Xcode reconheça
-          echo "$MOBILEPROVISION" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+          echo "$MOBILEPROVISION" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision
+          
+          # Extrai o UUID real do arquivo para o Xcode conseguir localizá-lo
+          UUID=$(grep -aA1 "UUID" ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision | grep -o "[-A-Z0-9]\{36\}")
+          cp ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
+          echo "PROVISIONING_PROFILE_UUID=$UUID" >> $GITHUB_ENV
 
       - name: Build iOS Archive
         run: |
-          # Usa -project pois não há .xcworkspace na pasta iosApp
+          # Executa o build usando o .xcodeproj (ajustado para a sua estrutura composeApp)
           xcodebuild -project iosApp/iosApp.xcodeproj \
             -scheme iosApp \
             -sdk iphoneos \
             -configuration Release \
             archive -archivePath $PWD/build/PaxRioVerde.xcarchive \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER=${{ env.PROVISIONING_PROFILE_UUID }} \
             ALLOW_PROVISIONING_DEVICE_REGISTRATION=NO \
             ALLOW_PROVISIONING_UPDATES=NO
 
       - name: Export IPA
         run: |
-          # Gera o arquivo de configuração de exportação com seus dados reais
+          # Cria o arquivo de configuração para exportação App Store
           echo '<?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -76,7 +80,7 @@ jobs:
               <key>provisioningProfiles</key>
               <dict>
                   <key>br.com.paxrioverde.app</key> 
-                  <string>profile.mobileprovision</string>
+                  <string>${{ env.PROVISIONING_PROFILE_UUID }}</string>
               </dict>
           </dict>
           </plist>' > ExportOptions.plist
