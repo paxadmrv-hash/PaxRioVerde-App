@@ -5,7 +5,6 @@ on:
     branches: [ main, master ]
 
 env:
-  # Garante compatibilidade com as versões mais recentes das Actions
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -27,11 +26,11 @@ jobs:
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Decodifica e importa o certificado P12
           echo "$P12_CERTIFICATE" | base64 --decode > certificate.p12
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          # Se der "wrong password", verifique se a senha no GitHub bate com a do certificado
           security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
@@ -39,18 +38,18 @@ jobs:
         env:
           MOBILEPROVISION: ${{ secrets.MOBILEPROVISION }}
         run: |
-          # Cria a pasta e decodifica o perfil
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo "$MOBILEPROVISION" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision
           
-          # Extrai o UUID real do arquivo para o Xcode conseguir localizá-lo
-          UUID=$(grep -aA1 "UUID" ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision | grep -o "[-A-Z0-9]\{36\}")
+          # Forma robusta: decodifica o CMS da Apple e extrai o UUID do XML resultante
+          UUID=$(security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision | grep -aA1 "UUID" | grep -o "[-A-Z0-9]\{36\}")
+          
           cp ~/Library/MobileDevice/Provisioning\ Profiles/temp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
           echo "PROVISIONING_PROFILE_UUID=$UUID" >> $GITHUB_ENV
+          echo "UUID detectado: $UUID"
 
       - name: Build iOS Archive
         run: |
-          # Executa o build usando o .xcodeproj (ajustado para a sua estrutura composeApp)
           xcodebuild -project iosApp/iosApp.xcodeproj \
             -scheme iosApp \
             -sdk iphoneos \
@@ -64,7 +63,6 @@ jobs:
 
       - name: Export IPA
         run: |
-          # Cria o arquivo de configuração para exportação App Store
           echo '<?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
