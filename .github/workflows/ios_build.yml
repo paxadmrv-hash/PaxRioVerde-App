@@ -1,0 +1,120 @@
+name: iOS Build and Deploy Pax Rio Verde
+
+on:
+  push:
+    branches: [ main, master ]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Install Apple Certificate
+        env:
+          P12_CERTIFICATE: ${{ secrets.P12_CERTIFICATE }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          printf '%s' "$P12_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign -f pkcs12
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+
+      - name: Decrypt and Install Provisioning Profile
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          GPG_FILE="iosApp/Pax_Rio_Verde.mobileprovision.gpg"
+          gpg --quiet --batch --yes --decrypt --passphrase "$GPG_PASSPHRASE" --output temp.mobileprovision "$GPG_FILE"
+          UUID=$(strings temp.mobileprovision | grep -A 1 "UUID" | grep -oE "[a-fA-F0-9]{8}-([a-fA-F0-9]{4}-){3}[a-fA-F0-9]{12}" | head -n 1)
+          cp temp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
+          echo "PROVISIONING_PROFILE_UUID=$UUID" >> $GITHUB_ENV
+
+      - name: Setup KMP Environment
+        run: |
+          chmod +x gradlew
+          ./gradlew clean assembleRelease
+
+      - name: Build iOS Archive
+        run: |
+          xcodebuild -project iosApp/iosApp.xcodeproj \
+            -scheme iosApp \
+            -sdk iphoneos \
+            -configuration Release \
+            archive -archivePath $PWD/build/PaxRioVerde.xcarchive \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER=${{ env.PROVISIONING_PROFILE_UUID }} \
+            ALLOW_PROVISIONING_DEVICE_REGISTRATION=NO \
+            ALLOW_PROVISIONING_UPDATES=NO
+
+      - name: Export IPA
+        run: |
+          echo '<?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store</string>
+              <key>teamID</key>
+              <string>264TWUW2L6</string>
+              <key>uploadSymbols</key>
+              <false/>
+              <key>compileBitcode</key>
+              <false/>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>br.com.paxrioverde.app</key> 
+                  <string>${{ env.PROVISIONING_PROFILE_UUID }}</string>
+              </dict>
+          </dict>
+          </plist>' > ExportOptions.plist
+
+          xcodebuild -exportArchive \
+            -archivePath $PWD/build/PaxRioVerde.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath $PWD/build/ipa \
+            -allowProvisioningUpdates NO
+
+      - name: Upload to App Store Connect
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_API_ISSUER_ID }}
+          API_KEY_CONTENT: ${{ secrets.APP_STORE_API_KEY_CONTENT }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          # O uso de EOF garante a preservação exata do formato da chave p8
+          cat <<EOF > ~/.appstoreconnect/private_keys/AuthKey_$API_KEY_ID.p8
+          $API_KEY_CONTENT
+          EOF
+          
+          xcrun altool --upload-app \
+            -f build/ipa/*.ipa \
+            -t ios \
+            --apiKey "$API_KEY_ID" \
+            --apiIssuer "$API_ISSUER_ID" \
+            --verbose
+
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-output
+          path: build/ipa/*.ipa
