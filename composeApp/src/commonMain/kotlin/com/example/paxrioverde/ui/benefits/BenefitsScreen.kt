@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.paxrioverde.util.urlEncode
 import org.jetbrains.compose.resources.painterResource
 import paxrioverde.composeapp.generated.resources.Res
 import paxrioverde.composeapp.generated.resources.ic_whatsapp_social
@@ -83,12 +84,12 @@ val benefitsCategories = listOf(
     BenefitsCategory("Fisioterapia", Icons.Default.SelfImprovement),
     BenefitsCategory("Educacao",     Icons.Default.School),
     BenefitsCategory("Alimentacao",  Icons.Default.Restaurant),
-    BenefitsCategory("Cinema",       Icons.Default.Movie),
+    BenefitsCategory("lazer",       Icons.Default.Movie),
     BenefitsCategory("Estetica",     Icons.Default.Spa),
     BenefitsCategory("Floricultura", Icons.Default.LocalFlorist),
     BenefitsCategory("Roupas",       Icons.Default.Checkroom),
     BenefitsCategory("Fitness",      Icons.Default.FitnessCenter),
-    BenefitsCategory("Outros",       Icons.Default.Category),
+    BenefitsCategory("Gás",       Icons.Default.Category),
 )
 
 // ─────────────────────────────────────────────
@@ -127,7 +128,7 @@ val realPartners: List<Partner> = listOf(
         "R. Rui Barbosa, 1261 - Centro (Clinica Solares), Rio Verde",
         "556484037105", "", Icons.Default.HealthAndSafety, "Saude"),
 
-    // CINEMA
+    // LAZER
     Partner("Cine A", "Ingresso por R\$10,00",
         "Av. Presidente Vargas, 1470 - Jardim Goias (Shopping Rio Verde), Rio Verde",
         "6436124216", "", Icons.Default.Movie, "Cinema"),
@@ -682,7 +683,7 @@ fun PartnerCard(partner: Partner) {
                                 onClick = {
                                     val clean = partner.whatsapp.replace(Regex("[^0-9]"), "")
                                     val msg = "Ola! Sou associado da Pax Rio Verde e gostaria de saber mais sobre os descontos."
-                                    uriHandler.openUri("https://wa.me/55$clean?text=${msg.replace(" ", "%20")}")
+                                    uriHandler.openUri("https://wa.me/55$clean?text=${urlEncode(msg)}")
                                 },
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen),
@@ -703,7 +704,7 @@ fun PartnerCard(partner: Partner) {
                         // Google Maps
                         OutlinedButton(
                             onClick = {
-                                uriHandler.openUri("https://www.google.com/maps/search/?api=1&query=${partner.name.replace(" ", "%20")}%20${partner.address.replace(" ", "%20")}")
+                                uriHandler.openUri("https://www.google.com/maps/search/?api=1&query=${urlEncode("${partner.name} ${partner.address}")}")
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Forest600),

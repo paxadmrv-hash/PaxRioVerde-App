@@ -84,29 +84,29 @@ object ApiService {
         valorCartao: String? = null,
         valorTotal: String? = null
     ): PixResponse {
-        return client.get("gerar_pix_cola") {
-            url {
-                parameters.append("PIX_REGISTRADO", "SIM")
-                parameters.append("IDCAIXA", idcaixa.toString())
-                parameters.append("IDCONTRATO", idcontrato.toString())
-                parameters.append("IDCONVENIO", idconvenio.toString())
-                parameters.append("DATA_VENCIMENTO", dtvencimento)
-                parameters.append("IDMENSALIDADE", idmensalidade.toString())
-                parameters.append("ID_MENSALIDADE", idmensalidade.toString())
+        return client.post("gerar_pix_cola") {
+            setBody(FormDataContent(Parameters.build {
+                append("PIX_REGISTRADO", "SIM")
+                append("IDCAIXA", idcaixa.toString())
+                append("IDCONTRATO", idcontrato.toString())
+                append("IDCONVENIO", idconvenio.toString())
+                append("DATA_VENCIMENTO", dtvencimento)
+                append("IDMENSALIDADE", idmensalidade.toString())
+                append("ID_MENSALIDADE", idmensalidade.toString())
                 
                 if (!valorCartao.isNullOrEmpty() && valorCartao != "0,00" && valorCartao != "0.00") {
                     val formattedValor = valorCartao.replace(",", ".")
-                    parameters.append("VALOR_CARTAO", formattedValor)
-                    parameters.append("VALOR_CARTAO_ADICIONAL", formattedValor)
-                    parameters.append("ADD_VALOR", formattedValor)
-                    parameters.append("valor_cartao", formattedValor)
+                    append("VALOR_CARTAO", formattedValor)
+                    append("VALOR_CARTAO_ADICIONAL", formattedValor)
+                    append("ADD_VALOR", formattedValor)
+                    append("valor_cartao", formattedValor)
                 }
 
                 if (!valorTotal.isNullOrEmpty()) {
-                    parameters.append("VALOR", valorTotal.replace(",", "."))
-                    parameters.append("valor", valorTotal.replace(",", "."))
+                    append("VALOR", valorTotal.replace(",", "."))
+                    append("valor", valorTotal.replace(",", "."))
                 }
-            }
+            }))
         }.body()
     }
 

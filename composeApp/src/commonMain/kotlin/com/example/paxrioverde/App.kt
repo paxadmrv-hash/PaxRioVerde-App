@@ -151,12 +151,7 @@ fun App() {
                     Surface(color = MaterialTheme.colorScheme.background) {
                         when (currentScreen) {
                             Screen.Dashboard -> {
-                                val displayValorCartao = if (userData?.valorcartao.isNullOrEmpty() || userData?.valorcartao == "0,00" || userData?.valorcartao == "0.00") {
-                                    if (WalletCache.totalValorCartoes > 0) {
-                                        val total = WalletCache.totalValorCartoes
-                                        if (total % 1.0 == 0.0) "${total.toInt()},00" else "${total}".replace(".", ",")
-                                    } else userData?.valorcartao
-                                } else userData?.valorcartao
+                                val displayValorCartao = userData?.valorcartao
 
                                 DashboardScreen(
                                     userData = userData,
@@ -186,12 +181,7 @@ fun App() {
                                 FaleConoscoScreen(onBackClick = { goBack() })
                             }
                             Screen.Finance -> {
-                                val displayValorCartao = if (userData?.valorcartao.isNullOrEmpty() || userData?.valorcartao == "0,00" || userData?.valorcartao == "0.00") {
-                                    if (WalletCache.totalValorCartoes > 0) {
-                                        val total = WalletCache.totalValorCartoes
-                                        if (total % 1.0 == 0.0) "${total.toInt()},00" else "${total}".replace(".", ",")
-                                    } else userData?.valorcartao
-                                } else userData?.valorcartao
+                                val displayValorCartao = userData?.valorcartao
 
                                 FinanceScreen(
                                     onBackClick = { goBack() },

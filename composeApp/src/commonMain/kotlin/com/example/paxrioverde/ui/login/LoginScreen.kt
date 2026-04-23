@@ -18,9 +18,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.paxrioverde.api.ApiService
@@ -79,6 +85,7 @@ fun LoginScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
 
     // Carregar dados salvos ao iniciar
     LaunchedEffect(Unit) {
@@ -89,7 +96,15 @@ fun LoginScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(
+                indication = null,
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            ) { focusManager.clearFocus() },
+        contentAlignment = Alignment.Center
+    ) {
         Image(
             painter = painterResource(Res.drawable.bg_login_family),
             contentDescription = null,
@@ -226,6 +241,26 @@ fun LoginScreen(
                 ) {
                     Text("PRIMEIRO ACESSO", color = BrandGreen, fontWeight = FontWeight.Bold)
                 }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                val uriHandler = LocalUriHandler.current
+                Text(
+                    text = buildAnnotatedString {
+                        append("Precisa de ajuda? ")
+                        withStyle(style = SpanStyle(
+                            fontWeight = FontWeight.Bold,
+                            textDecoration = TextDecoration.Underline
+                        )) {
+                            append("Fale Conosco")
+                        }
+                    },
+                    fontSize = 14.sp,
+                    color = BrandGreen,
+                    modifier = Modifier.clickable {
+                        uriHandler.openUri("https://wa.me/556436203131")
+                    }
+                )
             }
         }
     }

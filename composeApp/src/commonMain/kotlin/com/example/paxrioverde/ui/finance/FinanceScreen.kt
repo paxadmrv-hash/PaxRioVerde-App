@@ -18,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -36,6 +37,7 @@ import com.example.paxrioverde.ui.notifications.NotificationCenter
 import com.example.paxrioverde.ui.notifications.NotificationType
 import com.example.paxrioverde.util.AppConstants
 import kotlinx.coroutines.launch
+import kotlinx.datetime.*
 
 // CORES
 val BrandGreen = Color(0xFF386641)
@@ -44,6 +46,17 @@ val SurfaceWhite = Color(0xFFFFFFFF)
 val BackgroundGray = Color(0xFFF0F2F5)
 val TextPrimary = Color(0xFF101820)
 val TextSecondary = Color(0xFF606C76)
+
+private fun parseDate(dateStr: String): LocalDate? {
+    return try {
+        val parts = dateStr.split("/")
+        if (parts.size == 3) {
+            LocalDate(parts[2].toInt(), parts[1].toInt(), parts[0].toInt())
+        } else null
+    } catch (e: Exception) {
+        null
+    }
+}
 
 @Composable
 fun FinanceScreen(
@@ -85,8 +98,29 @@ fun FinanceScreen(
     val years = remember(anosData) { anosData.map { it.ano }.distinct().sortedDescending() }
     var selectedYear by remember(years) { mutableStateOf(years.firstOrNull() ?: 2024) }
     
-    val historyInvoices = remember(selectedYear, anosData) {
-        anosData.find { it.ano == selectedYear }?.mensalidades ?: emptyList()
+    val oldestUnpaid = remember(anosData) {
+        anosData.flatMap { it.mensalidades }
+            .filter { !it.pago }
+            .mapNotNull { item -> parseDate(item.dtvencimento)?.let { it to item } }
+            .sortedBy { it.first }
+            .firstOrNull()?.second
+    }
+
+    val historyInvoices = remember(selectedYear, anosData, oldestUnpaid) {
+        val allForYear = anosData.find { it.ano == selectedYear }?.mensalidades ?: emptyList()
+        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+        
+        allForYear.filter { item ->
+            // 1. Mostrar se já está pago
+            if (item.pago) return@filter true
+            
+            // 2. Mostrar se for a próxima a vencer (mesmo que futura)
+            if (item.idmensalidade == oldestUnpaid?.idmensalidade) return@filter true
+            
+            // 3. Mostrar se estiver vencida ou for do mês atual
+            val date = parseDate(item.dtvencimento) ?: return@filter true
+            date.year < today.year || (date.year == today.year && date.monthNumber <= today.monthNumber)
+        }
     }
 
     var showPixDialog by remember { mutableStateOf(false) }
@@ -96,21 +130,25 @@ fun FinanceScreen(
     var showBoletoDialog by remember { mutableStateOf(false) }
     var barCode by remember { mutableStateOf("") }
 
-    val currentValorCartao = remember(selectedMensalidade, valorCartao, vencProxMens) {
-        // Só aplica o valor do cartão se:
-        // 1. Não houver mensalidade selecionada (estamos na tela inicial mostrando a "próxima")
-        // 2. OU se a mensalidade selecionada for exatamente a próxima (mesmo vencimento)
-        val isTargetMensalidade = selectedMensalidade == null || selectedMensalidade?.dtvencimento?.trim() == vencProxMens.trim()
+    val currentValorCartao = remember(selectedMensalidade, oldestUnpaid, vencProxMens, com.example.paxrioverde.api.WalletCache.pendingCardFee) {
+        // Só aplica o valor do cartão se for a mensalidade correta
+        val targetVenc = selectedMensalidade?.dtvencimento ?: oldestUnpaid?.dtvencimento ?: vencProxMens
+        val isTargetMensalidade = targetVenc.trim() == vencProxMens.trim()
         
-        if (isTargetMensalidade && !valorCartao.isNullOrEmpty() && valorCartao != "0,00" && valorCartao != "0.00" && valorCartao != "0") {
-            valorCartao
+        // IGNORA o valor vindo da API. Usa APENAS o gerado na sessão.
+        val feeToUse = com.example.paxrioverde.api.WalletCache.pendingCardFee
+        val cleanValor = feeToUse?.replace("R$", "")?.replace(",", ".")?.trim()
+        val valorNumerico = cleanValor?.toDoubleOrNull() ?: 0.0
+
+        if (isTargetMensalidade && valorNumerico > 0.1) {
+            feeToUse?.replace("R$", "")?.trim()
         } else {
             null
         }
     }
 
-    val totalValor = remember(selectedMensalidade, valorProxMens, currentValorCartao) {
-        val baseValor = selectedMensalidade?.valormensalidade ?: valorProxMens
+    val totalValor = remember(selectedMensalidade, oldestUnpaid, valorProxMens, currentValorCartao) {
+        val baseValor = selectedMensalidade?.valormensalidade ?: oldestUnpaid?.valormensalidade ?: valorProxMens
         
         if (currentValorCartao != null) {
             try {
@@ -151,9 +189,9 @@ fun FinanceScreen(
             FinanceHeader(
                 onBackClick = onBackClick,
                 valor = totalValor,
-                vencimento = selectedMensalidade?.dtvencimento ?: vencProxMens,
+                vencimento = selectedMensalidade?.dtvencimento ?: oldestUnpaid?.dtvencimento ?: vencProxMens,
                 onPixClick = { 
-                    val mens = selectedMensalidade ?: historyInvoices.firstOrNull { !it.pago }
+                    val mens = selectedMensalidade ?: oldestUnpaid ?: historyInvoices.firstOrNull { !it.pago }
                     if (mens != null) {
                         scope.launch {
                             isGeneratingPayment = true
@@ -167,14 +205,18 @@ fun FinanceScreen(
                                     valorCartao = currentValorCartao,
                                     valorTotal = totalValor
                                 )
-                                pixCode = pixResponse.pixCode
-                                showPixDialog = true
-                                
-                                NotificationCenter.addNotification(
-                                    title = "PIX Gerado",
-                                    message = "O código para a mensalidade de R$ $totalValor foi gerado com sucesso.",
-                                    type = NotificationType.PAYMENT
-                                )
+                                if (!pixResponse.pixCode.isNullOrEmpty()) {
+                                    pixCode = pixResponse.pixCode
+                                    showPixDialog = true
+                                    
+                                    NotificationCenter.addNotification(
+                                        title = "PIX Gerado",
+                                        message = "O código para a mensalidade de R$ $totalValor foi gerado com sucesso.",
+                                        type = NotificationType.PAYMENT
+                                    )
+                                } else {
+                                    errorMessage = "Erro ao gerar PIX: ${pixResponse.message ?: "Resposta vazia do servidor"}"
+                                }
                             } catch (e: Exception) {
                                 errorMessage = "Erro ao gerar PIX: ${e.message}"
                             } finally {
@@ -184,7 +226,7 @@ fun FinanceScreen(
                     }
                 },
                 onBoletoClick = { 
-                    val mens = selectedMensalidade ?: historyInvoices.firstOrNull { !it.pago }
+                    val mens = selectedMensalidade ?: oldestUnpaid ?: historyInvoices.firstOrNull { !it.pago }
                     if (mens != null) {
                         scope.launch {
                             isGeneratingPayment = true
@@ -216,7 +258,7 @@ fun FinanceScreen(
                         }
                     }
                 },
-                showBoleto = selectedMensalidade?.boleto ?: showBoletoButton,
+                showBoleto = selectedMensalidade?.boleto ?: oldestUnpaid?.boleto ?: showBoletoButton,
                 isProcessing = isGeneratingPayment,
                 acrescimoCartao = currentValorCartao
             )
@@ -252,11 +294,15 @@ fun FinanceScreen(
                     }
 
                     items(historyInvoices) { item ->
+                        val isFirstUnpaid = oldestUnpaid?.idmensalidade == item.idmensalidade
+                        val canSelect = item.pago || isFirstUnpaid
+
                         HistoryInvoiceItem(
                             item = item,
                             isSelected = selectedMensalidade?.idmensalidade == item.idmensalidade,
+                            enabled = canSelect,
                             onClick = {
-                                if (!item.pago) {
+                                if (!item.pago && canSelect) {
                                     selectedMensalidade = item
                                 }
                             }
@@ -381,20 +427,28 @@ fun YearDropdownSelector(years: List<Int>, selectedYear: Int, onYearSelected: (I
 }
 
 @Composable
-fun HistoryInvoiceItem(item: MensalidadeItem, isSelected: Boolean, onClick: () -> Unit) {
-    val statusColor = if (item.pago) BrandGreen else if (isSelected) BrandGreen else Color(0xFFD32F2F)
+fun HistoryInvoiceItem(
+    item: MensalidadeItem, 
+    isSelected: Boolean, 
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    val statusColor = if (item.pago) BrandGreen else if (isSelected) BrandGreen else if (enabled) Color(0xFFD32F2F) else Color.Gray
     
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = if (isSelected) BrandGreen.copy(alpha = 0.05f) else SurfaceWhite),
         border = if (isSelected) BorderStroke(2.dp, BrandGreen) else null,
-        modifier = Modifier.fillMaxWidth().clickable { onClick() }
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled || item.pago) { onClick() }
+            .alpha(if (!item.pago && !enabled) 0.5f else 1f)
     ) {
         Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(statusColor.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = if (item.pago) Icons.Default.CheckCircle else Icons.Default.PendingActions, 
+                        imageVector = if (item.pago) Icons.Default.CheckCircle else if (enabled) Icons.Default.PendingActions else Icons.Default.Lock, 
                         contentDescription = null, 
                         tint = statusColor, 
                         modifier = Modifier.size(20.dp)
@@ -409,7 +463,12 @@ fun HistoryInvoiceItem(item: MensalidadeItem, isSelected: Boolean, onClick: () -
             Column(horizontalAlignment = Alignment.End) {
                 Text(text = "R$ ${item.valormensalidade}", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextPrimary)
                 if (!item.pago) {
-                    Text(text = "PENDENTE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFFD32F2F))
+                    Text(
+                        text = if (enabled) "PENDENTE" else "BLOQUEADO", 
+                        fontSize = 10.sp, 
+                        fontWeight = FontWeight.Bold, 
+                        color = statusColor
+                    )
                 }
             }
         }

@@ -140,11 +140,7 @@ fun PlansScreen(
                         desc = "Sorteio de 1 Moto 0km e prêmios variados.",
                         icon = Icons.Outlined.Celebration
                     )
-                    IncludedItemCard(
-                        title = "Sorteio Trimestral",
-                        desc = "Sorteio de Eletrodomésticos e utilidades.",
-                        icon = Icons.Outlined.CardGiftcard
-                    )
+
                 }
             }
 
@@ -161,7 +157,7 @@ fun PlansScreen(
                         HorizontalDivider(color = SoftGrayBg, modifier = Modifier.padding(vertical = 8.dp))
                         ExcludedItemRow("Tanatopraxia e Embalsamento")
                         HorizontalDivider(color = SoftGrayBg, modifier = Modifier.padding(vertical = 8.dp))
-                        ExcludedItemRow("Roupas para o falecido")
+                        ExcludedItemRow("Roupas para o seu ente querido")
                         HorizontalDivider(color = SoftGrayBg, modifier = Modifier.padding(vertical = 8.dp))
                         ExcludedItemRow("Reconstituição Facial")
                     }
@@ -243,13 +239,6 @@ fun BentoCardHero(userPlano: String, valorMensalidade: String) {
                     letterSpacing = 1.sp
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Cobertura Completa + Sogros",
-                color = Color.White.copy(alpha = 0.9f),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
             Text(
                 text = "Mensalidade: R$ $valorMensalidade",
                 color = Color.White,

@@ -3,6 +3,7 @@ package com.example.paxrioverde.ui.login
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,12 +18,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.paxrioverde.api.ApiService
+import com.example.paxrioverde.util.urlEncode
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import paxrioverde.composeapp.generated.resources.Res
@@ -33,6 +36,7 @@ import paxrioverde.composeapp.generated.resources.bg_login_family
 fun FirstAccessScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
+    val focusManager = LocalFocusManager.current
 
     var cpf by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
@@ -75,7 +79,14 @@ fun FirstAccessScreen(onBack: () -> Unit) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable(
+                indication = null,
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            ) { focusManager.clearFocus() }
+    ) {
         Image(
             painter = painterResource(Res.drawable.bg_login_family),
             contentDescription = null,
@@ -192,7 +203,7 @@ fun FirstAccessScreen(onBack: () -> Unit) {
                     TextButton(onClick = {
                         val whatsappAjuda = "5564992784186"
                         val msg = "Olá, preciso de ajuda com o primeiro acesso no aplicativo."
-                        uriHandler.openUri("https://wa.me/$whatsappAjuda?text=${msg.replace(" ", "%20")}")
+                        uriHandler.openUri("https://wa.me/$whatsappAjuda?text=${urlEncode(msg)}")
                     }) {
                         Text("Precisa de ajuda? Fale conosco", color = Color(0xFF386641))
                     }

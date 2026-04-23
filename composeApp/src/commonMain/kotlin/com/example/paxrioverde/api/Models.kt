@@ -72,7 +72,9 @@ data class MensalidadeItem(
 
 @Serializable
 data class PixResponse(
-    @SerialName("PIX") val pixCode: String
+    @SerialName("PIX") val pixCode: String? = null,
+    @SerialName("success") val success: Boolean? = null,
+    @SerialName("message") val message: String? = null
 )
 
 @Serializable

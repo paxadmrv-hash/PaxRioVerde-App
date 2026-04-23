@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.paxrioverde.util.urlEncode
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import paxrioverde.composeapp.generated.resources.*
@@ -70,7 +71,7 @@ fun FaleConoscoScreen(onBackClick: () -> Unit) {
 
                 SectionTitle(icon = Icons.Default.Phone, title = "WhatsApp")
                 ContactCard(Icons.Default.Phone, "WhatsApp Comercial", "(64) 9278-4186", isWhatsApp = true) {
-                    uriHandler.openUri("https://wa.me/5564992784186")
+                    uriHandler.openUri("https://wa.me/556481460004")
                 }
                 ContactCard(Icons.Default.Phone, "WhatsApp Funerária (Plantão 24h)", "(64) 98403-9405", isWhatsApp = true) {
                     uriHandler.openUri("https://wa.me/5564984039405")
@@ -100,7 +101,7 @@ fun FaleConoscoScreen(onBackClick: () -> Unit) {
                     icon = Icons.Default.LocationOn,
                     title = "Endereço",
                     modifier = Modifier.clickable {
-                        uriHandler.openUri("https://www.google.com/maps/search/?api=1&query=$enderecoSede")
+                        uriHandler.openUri("https://www.google.com/maps/search/?api=1&query=${urlEncode(enderecoSede)}")
                     }
                 ) {
                     Text("Grupo Universo - Sede Administrativa", fontWeight = FontWeight.SemiBold, color = Color(0xFF333333))
@@ -111,8 +112,8 @@ fun FaleConoscoScreen(onBackClick: () -> Unit) {
                 }
 
                 InfoCard(Icons.Default.DateRange, "Horário de Atendimento") {
-                    ScheduleRow("Segunda a Sexta", "08:00 - 18:00")
-                    ScheduleRow("Sábado", "08:00 - 12:00")
+                    ScheduleRow("Segunda a Sexta", "07:00 - 18:00")
+                    ScheduleRow("Sábado", "07:00 - 12:00")
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color(0xFFEEEEEE))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Plantão 24h", fontWeight = FontWeight.Bold)

@@ -68,6 +68,7 @@ fun DashboardScreen(
                 userName = userData?.nomecliente ?: "Visitante",
                 userPlano = userData?.plano ?: "Carregando...",
                 userProxMens = userData?.prox_mens ?: "--/--/----",
+                valorMensalidade = userData?.valormens_prox_mens ?: "0,00",
                 valorCartao = userData?.valorcartao,
                 onOpenDrawer = onOpenDrawer,
                 onOpenNotifications = onOpenNotifications,
@@ -84,7 +85,7 @@ fun DashboardScreen(
                 Text(text = "Acesso Rápido", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextDark, modifier = Modifier.padding(bottom = 12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     QuickActionItem(icon = Icons.Outlined.CreditCard, label = "Carteira", onClick = onOpenWallet)
-                    QuickActionItem(icon = Icons.Outlined.Receipt, label = "Boletos", onClick = onOpenBoleto)
+                    QuickActionItem(icon = Icons.Outlined.Receipt, label = "Mensalidades", onClick = onOpenBoleto)
                     QuickActionItem(icon = Icons.Outlined.CardGiftcard, label = "Vantagens", onClick = onOpenBenefits)
                     QuickActionItem(icon = Icons.Outlined.PersonAdd, label = "Indicar", onClick = onOpenReferral)
                 }
@@ -116,6 +117,7 @@ fun DashboardHeader(
     userName: String, 
     userPlano: String, 
     userProxMens: String, 
+    valorMensalidade: String,
     valorCartao: String?,
     onOpenDrawer: () -> Unit, 
     onOpenNotifications: () -> Unit, 
@@ -124,6 +126,36 @@ fun DashboardHeader(
     val firstName = remember(userName) {
         val rawName = userName.trim().split(" ").firstOrNull() ?: "Cliente"
         rawName.lowercase().replaceFirstChar { it.uppercase() }
+    }
+
+    val totalMensalidade = remember(valorMensalidade, com.example.paxrioverde.api.WalletCache.pendingCardFee) {
+        try {
+            // Limpa o valor da mensalidade base (ex: "R$ 55,00" -> 55.0)
+            val baseStr = valorMensalidade.replace("R$", "").replace(".", "").replace(",", ".").trim()
+            val base = baseStr.toDoubleOrNull() ?: 0.0
+            
+            // Ignoramos completamente o valorCartao que vem por parâmetro (da API)
+            // e usamos APENAS o que foi gerado nesta sessão específica.
+            val extraStr = com.example.paxrioverde.api.WalletCache.pendingCardFee ?: "0.00"
+            val extra = extraStr.replace("R$", "").replace(".", "").replace(",", ".").toDoubleOrNull() ?: 0.0
+            
+            if (extra > 0.1) {
+                val total = base + extra
+                val totalStr = total.toString().replace(".", ",")
+                if (totalStr.contains(",")) {
+                    val parts = totalStr.split(",")
+                    val decimals = if (parts[1].length == 1) parts[1] + "0" else parts[1].take(2)
+                    "${parts[0]},$decimals"
+                } else {
+                    "$totalStr,00"
+                }
+            } else {
+                // Se não gerou cartão nesta sessão, mostra exatamente o que veio na mensalidade base
+                valorMensalidade.replace("R$", "").trim()
+            }
+        } catch (e: Exception) {
+            valorMensalidade.replace("R$", "").trim()
+        }
     }
 
     Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)).background(BrandGreen).statusBarsPadding().padding(24.dp)) {
@@ -147,7 +179,7 @@ fun DashboardHeader(
             Surface(color = Color.White.copy(alpha = 0.15f), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
                 Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
-                        Text("Próxima Mensalidade", color = Color.White.copy(alpha = 0.9f), fontSize = 12.sp)
+                        Text("Próxima Mensalidade: R$ $totalMensalidade", color = Color.White.copy(alpha = 0.9f), fontSize = 12.sp)
                         
                         Text(userProxMens, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     }

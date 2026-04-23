@@ -13,6 +13,9 @@ object WalletCache {
     val dependentesList = mutableStateListOf<DependenteItem>()
     val loadedBitmaps = mutableStateMapOf<Int, ImageBitmap>()
     var isPreloading by mutableStateOf(false)
+    
+    // Rastreia se houve uma geração de cartão nesta sessão
+    var pendingCardFee by mutableStateOf<String?>(null)
 
     val totalValorCartoes: Double
         get() = cartoesList.sumOf { 
@@ -61,5 +64,6 @@ object WalletCache {
         cartoesList.clear()
         dependentesList.clear()
         loadedBitmaps.clear()
+        pendingCardFee = null
     }
 }

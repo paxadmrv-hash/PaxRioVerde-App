@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,6 +46,9 @@ val TextWhite = Color(0xFFE3E3E3)
 val TextGray = Color(0xFF8E8E93)
 val ExpiredRed = Color(0xFFFF5252)
 
+// Mapa para lembrar o estilo escolhido pelo usuário nesta sessão
+private val cardStyleOverrides = mutableStateMapOf<Int, String>()
+
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun VirtualCardScreen(
@@ -56,7 +60,7 @@ fun VirtualCardScreen(
     idcaixa: Int = 0,
     idfilial: Int = 0,
     dtvencimento: String = "",
-    valorCartao: String? = "5,00",
+    valorCartao: String? = null,
     onCardGenerated: () -> Unit = {},
     onNavigateToFinance: () -> Unit = {}
 ) {
@@ -73,6 +77,7 @@ fun VirtualCardScreen(
     }
 
     val pagerState = rememberPagerState(pageCount = { cartoesList.size })
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         containerColor = WalletDarkBg,
@@ -96,13 +101,29 @@ fun VirtualCardScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Área do Cartão com altura fixa proporcional
-            Box(
+            // Área do Cartão com design estilo Carrossel
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.45f),
-                contentAlignment = Alignment.Center
+                    .fillMaxHeight(0.45f)
+                    .padding(vertical = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
+                Text(
+                    text = "SEUS CARTÕES",
+                    color = TextWhite,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Text(
+                    text = "Deslize para ver todos os seus cartões",
+                    color = TextGray,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+
                 if (isPreloading && cartoesList.isEmpty()) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = BrandLightGreen)
@@ -114,7 +135,7 @@ fun VirtualCardScreen(
                 } else {
                     HorizontalPager(
                         state = pagerState,
-                        contentPadding = PaddingValues(horizontal = 32.dp),
+                        contentPadding = PaddingValues(horizontal = 48.dp),
                         pageSpacing = 16.dp,
                         modifier = Modifier.fillMaxWidth()
                     ) { page ->
@@ -141,6 +162,29 @@ fun VirtualCardScreen(
                                 // Design do Cartão com Imagem Local
                                 CardContent(item = item)
                             }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Indicadores (Dots) estilo o anexo
+                    Row(
+                        modifier = Modifier.height(8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        repeat(cartoesList.size) { iteration ->
+                            val isSelected = pagerState.currentPage == iteration
+                            val color = if (isSelected) BrandLightGreen else Color.DarkGray
+                            val size = if (isSelected) 8.dp else 6.dp
+                            
+                            Box(
+                                modifier = Modifier
+                                    .padding(horizontal = 4.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(color)
+                                    .size(size)
+                            )
                         }
                     }
                 }
@@ -181,8 +225,14 @@ fun VirtualCardScreen(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(cartoesList) { card ->
-                        ActiveCardRow(item = card)
+                    itemsIndexed(cartoesList) { index, card ->
+                        Box(modifier = Modifier.clickable {
+                            scope.launch {
+                                pagerState.animateScrollToPage(index)
+                            }
+                        }) {
+                            ActiveCardRow(item = card)
+                        }
                     }
                 }
             }
@@ -215,8 +265,12 @@ fun VirtualCardScreen(
 
 @Composable
 fun CardContent(item: CartaoItem) {
-    val isKids = item.tipo.contains("KIDS", ignoreCase = true)
-    
+    // Verifica se temos um estilo salvo localmente para este ID, senão usa o tipo do backend
+    val style = cardStyleOverrides[item.idControle] ?: item.tipo
+    val lowerTipo = style.lowercase()
+    val isKids = lowerTipo.contains("kids")
+    val isTeen = lowerTipo.contains("teen")
+
     val parentesco = if (item.dep == "S") {
         WalletCache.dependentesList.find { it.nomeDependente == item.nomeDependente }?.parentesco ?: "DEPENDENTE"
     } else {
@@ -225,7 +279,7 @@ fun CardContent(item: CartaoItem) {
 
     val backgroundResource = when {
         isKids -> Res.drawable.card_kids
-        item.tipo.contains("TEEN", ignoreCase = true) -> Res.drawable.card_teen
+        isTeen -> Res.drawable.card_teen
         else -> Res.drawable.card_titular
     }
 
@@ -381,7 +435,7 @@ fun GerarCartaoDialog(
     idcaixa: Int,
     idfilial: Int,
     dtvencimento: String,
-    valorCartao: String? = "5,00",
+    valorCartao: String? = null,
     onSuccess: () -> Unit = {},
     onNavigateToFinance: () -> Unit = {}
 ) {
@@ -389,6 +443,12 @@ fun GerarCartaoDialog(
     val dependentesList = WalletCache.dependentesList
     var selectedDependente by remember { mutableStateOf<DependenteItem?>(null) }
     var expanded by remember { mutableStateOf(false) }
+    
+    // Novas variáveis para seleção de estilo visual
+    val estilos = listOf("Adulto", "Teen", "Kids")
+    var selectedEstilo by remember { mutableStateOf(estilos[0]) }
+    var expandedEstilo by remember { mutableStateOf(false) }
+
     val scope = rememberCoroutineScope()
 
     val valorFormatado = remember(valorCartao) {
@@ -454,8 +514,11 @@ fun GerarCartaoDialog(
                         scope.launch {
                             isLoading = true
                             try {
-                                val tipo = if (isTitular) "titular" else "dependente"
+                                val tipoBackend = if (isTitular) "titular" else "dependente"
                                 val nomeDep = if (isTitular) "" else selectedDependente?.nomeDependente ?: ""
+                                
+                                // O campo 'tipo' enviado ao backend permanece 'titular' ou 'dependente'
+                                // para não quebrar a lógica do servidor.
                                 
                                 // Limpa o valor para enviar apenas números e ponto
                                 val valorLimpo = if (valorCartao.isNullOrEmpty() || valorCartao == "0,00" || valorCartao == "0.00") "5.00" else {
@@ -468,7 +531,7 @@ fun GerarCartaoDialog(
                                 // Envio dos dados para geração do cartão e acionamento do financeiro
                                 val response = ApiService.gerarCartao(
                                     idcliente = idcliente,
-                                    tipo = tipo,
+                                    tipo = tipoBackend,
                                     nomeDependente = nomeDep,
                                     idcontrato = idcontrato,
                                     idconvenio = idconvenio,
@@ -480,12 +543,30 @@ fun GerarCartaoDialog(
                                 )
                                 
                                 if (response.success) {
+                                    // Captura os IDs atuais antes de atualizar
+                                    val oldIds = WalletCache.cartoesList.map { it.idControle }.toSet()
+                                    
                                     isSuccess = true
                                     resultMessage = "Cartão gerado com sucesso! A cobrança de $valorFormatado foi lançada em seu financeiro."
                                     
+                                    // Registra o acréscimo pendente no cache para exibição na sessão
+                                    WalletCache.pendingCardFee = valorLimpo
+
                                     // Recarrega cartões e notifica o App para atualizar dados do usuário
                                     WalletCache.clear() // Limpa o cache para garantir que venha do servidor
                                     WalletCache.preLoad(idcliente, forceRefresh = true)
+                                    
+                                    // Tenta encontrar o novo cartão e aplica o estilo escolhido
+                                    val newCards = WalletCache.cartoesList.filter { it.idControle !in oldIds }
+                                    if (newCards.isNotEmpty()) {
+                                        newCards.forEach { cardStyleOverrides[it.idControle] = selectedEstilo }
+                                    } else {
+                                        // Fallback: se não achar pelo ID novo, pega o último da lista
+                                        WalletCache.cartoesList.lastOrNull()?.let { 
+                                            cardStyleOverrides[it.idControle] = selectedEstilo 
+                                        }
+                                    }
+
                                     onSuccess() 
                                 } else {
                                     isSuccess = false
@@ -544,6 +625,51 @@ fun GerarCartaoDialog(
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { isTitular = false }) {
                     RadioButton(selected = !isTitular, onClick = { isTitular = false }, colors = RadioButtonDefaults.colors(selectedColor = BrandLightGreen))
                     Text("Dependente", color = Color.Black)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Seletor de Estilo Visual (Apenas visual, não afeta o 'tipo' enviado ao backend)
+                Text(
+                    "Estilo do Cartão",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Gray,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                )
+
+                ExposedDropdownMenuBox(
+                    expanded = expandedEstilo,
+                    onExpandedChange = { expandedEstilo = !expandedEstilo }
+                ) {
+                    OutlinedTextField(
+                        value = selectedEstilo,
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedEstilo) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = BrandLightGreen,
+                            unfocusedBorderColor = Color.LightGray,
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black
+                        )
+                    )
+
+                    ExposedDropdownMenu(
+                        expanded = expandedEstilo,
+                        onDismissRequest = { expandedEstilo = false }
+                    ) {
+                        estilos.forEach { estilo ->
+                            DropdownMenuItem(
+                                text = { Text(estilo) },
+                                onClick = {
+                                    selectedEstilo = estilo
+                                    expandedEstilo = false
+                                }
+                            )
+                        }
+                    }
                 }
 
                 if (!isTitular) {

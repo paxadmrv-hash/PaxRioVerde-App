@@ -45,7 +45,7 @@ fun ReferFriendScreen(onBack: () -> Unit) {
         // Como é uma indicação, o usuário envia para a Pax sobre o amigo, 
         // ou envia para o amigo um convite. 
         // Geralmente, "Indicou, Ganhou" envia para o comercial da Pax.
-        val whatsappComercial = "55648146-0004"
+        val whatsappComercial = "556481460004"
         val message = "Olá! Gostaria de indicar um amigo para a Pax Rio Verde:\nNome: $friendName\nWhatsApp: $friendPhone"
         uriHandler.openUri("https://wa.me/$whatsappComercial?text=${urlEncode(message)}")
     }
@@ -219,20 +219,19 @@ fun ReferFriendScreen(onBack: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                modifier = Modifier.fillMaxWidth().padding(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Default.Shield,
-                    contentDescription = null,
-                    tint = Color.Gray,
-                    modifier = Modifier.size(16.dp)
+                Icon(contentDescription = "Condição para pagamento",
+                    imageVector = Icons.Default.Info,
+                    tint = Color(0xFF0288D1),
+                    modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Seus dados estão protegidos pela LGPD.",
+                    text = "SÓ GANHA A MENSALIDADE OU EXTRA MEDIANTE CONFIRMAÇÃO DO PLANO E PAGAMENTO DA ADESÃO DO INDICADO.",
                     fontSize = 11.sp,
-                    color = Color.Gray
+                    color = Color.Red
                 )
             }
         }
