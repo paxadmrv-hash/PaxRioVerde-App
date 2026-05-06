@@ -52,4 +52,16 @@ actual class SessionManager actual constructor() {
     actual fun savePetsJson(json: String) {
         userDefaults.setObject(json, "saved_pets_json")
     }
+
+    actual fun getPendingCardFee(): String? {
+        return userDefaults.stringForKey("pending_card_fee")
+    }
+
+    actual fun savePendingCardFee(fee: String?) {
+        if (fee == null) {
+            userDefaults.removeObjectForKey("pending_card_fee")
+        } else {
+            userDefaults.setObject(fee, "pending_card_fee")
+        }
+    }
 }

@@ -274,4 +274,33 @@ object ApiService {
             }))
         }.body()
     }
+
+    suspend fun esquecerSenha(cpfOrEmail: String): GenericResponse {
+        return client.post("esquecer_senha_app") {
+            setBody(FormDataContent(Parameters.build {
+                if (cpfOrEmail.contains("@")) {
+                    append("email", cpfOrEmail)
+                    append("login", cpfOrEmail)
+                } else {
+                    val digits = cpfOrEmail.filter { it.isDigit() }
+                    append("cpf", digits)
+                    append("login", digits)
+                }
+            }))
+        }.body()
+    }
+
+    suspend fun redefinirSenha(cpf: String, token: String, senha: String): GenericResponse {
+        return client.post("redefinir_senha_app") {
+            setBody(FormDataContent(Parameters.build {
+                val digits = if (cpf.contains("@")) cpf else cpf.filter { it.isDigit() }
+                append("cpf", digits)
+                append("token", token)
+                append("senha", senha)
+                append("login", digits)
+                append("password", senha)
+                append("codigo", token)
+            }))
+        }.body()
+    }
 }

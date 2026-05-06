@@ -33,6 +33,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.paxrioverde.api.AnoItem
 import com.example.paxrioverde.api.ApiService
 import com.example.paxrioverde.api.MensalidadeItem
+import com.example.paxrioverde.api.WalletCache
 import com.example.paxrioverde.ui.notifications.NotificationCenter
 import com.example.paxrioverde.ui.notifications.NotificationType
 import com.example.paxrioverde.util.AppConstants
@@ -106,21 +107,43 @@ fun FinanceScreen(
             .firstOrNull()?.second
     }
 
+    // Lógica para remover o aviso de taxa de cartão se a mensalidade alvo for paga
+    LaunchedEffect(anosData) {
+        if (WalletCache.pendingCardFee != null) {
+            // Só limpa se encontrarmos a mensalidade alvo e ela estiver MARCADA COMO PAGA
+            val targetInvoicePaid = anosData.flatMap { it.mensalidades }
+                .any { it.dtvencimento == vencProxMens && it.pago }
+            
+            if (targetInvoicePaid && vencProxMens != "--/--/----") {
+                WalletCache.updatePendingCardFee(null)
+            }
+        }
+    }
+
     val historyInvoices = remember(selectedYear, anosData, oldestUnpaid) {
         val allForYear = anosData.find { it.ano == selectedYear }?.mensalidades ?: emptyList()
         val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
         
+        // Identifica as próximas 3 mensalidades não pagas (incluindo a atual se não estiver paga)
+        val futureUnpaidIds = allForYear
+            .filter { !it.pago }
+            .mapNotNull { item -> parseDate(item.dtvencimento)?.let { it to item } }
+            .sortedBy { it.first }
+            .take(3)
+            .map { it.second.idmensalidade }
+            .toSet()
+
         allForYear.filter { item ->
             // 1. Mostrar se já está pago
             if (item.pago) return@filter true
             
-            // 2. Mostrar se for a próxima a vencer (mesmo que futura)
-            if (item.idmensalidade == oldestUnpaid?.idmensalidade) return@filter true
+            // 2. Mostrar se for uma das próximas 3 a vencer
+            if (futureUnpaidIds.contains(item.idmensalidade)) return@filter true
             
-            // 3. Mostrar se estiver vencida ou for do mês atual
+            // 3. Mostrar se estiver vencida (mês anterior ou anos anteriores)
             val date = parseDate(item.dtvencimento) ?: return@filter true
             date.year < today.year || (date.year == today.year && date.monthNumber <= today.monthNumber)
-        }
+        }.sortedBy { parseDate(it.dtvencimento) }
     }
 
     var showPixDialog by remember { mutableStateOf(false) }
@@ -130,51 +153,10 @@ fun FinanceScreen(
     var showBoletoDialog by remember { mutableStateOf(false) }
     var barCode by remember { mutableStateOf("") }
 
-    val currentValorCartao = remember(selectedMensalidade, oldestUnpaid, vencProxMens, com.example.paxrioverde.api.WalletCache.pendingCardFee) {
-        // Só aplica o valor do cartão se for a mensalidade correta
-        val targetVenc = selectedMensalidade?.dtvencimento ?: oldestUnpaid?.dtvencimento ?: vencProxMens
-        val isTargetMensalidade = targetVenc.trim() == vencProxMens.trim()
-        
-        // IGNORA o valor vindo da API. Usa APENAS o gerado na sessão.
-        val feeToUse = com.example.paxrioverde.api.WalletCache.pendingCardFee
-        val cleanValor = feeToUse?.replace("R$", "")?.replace(",", ".")?.trim()
-        val valorNumerico = cleanValor?.toDoubleOrNull() ?: 0.0
-
-        if (isTargetMensalidade && valorNumerico > 0.1) {
-            feeToUse?.replace("R$", "")?.trim()
-        } else {
-            null
-        }
+    val totalValor = remember(selectedMensalidade, oldestUnpaid, valorProxMens) {
+        selectedMensalidade?.valormensalidade ?: oldestUnpaid?.valormensalidade ?: valorProxMens
     }
 
-    val totalValor = remember(selectedMensalidade, oldestUnpaid, valorProxMens, currentValorCartao) {
-        val baseValor = selectedMensalidade?.valormensalidade ?: oldestUnpaid?.valormensalidade ?: valorProxMens
-        
-        if (currentValorCartao != null) {
-            try {
-                val base = baseValor.replace(".", "").replace(",", ".").toDouble()
-                val extra = currentValorCartao.replace(".", "").replace(",", ".").toDouble()
-                
-                if (extra > 0.0) {
-                    val total = base + extra
-                    val totalStr = (total).toString().replace(".", ",")
-                    if (totalStr.contains(",")) {
-                        val parts = totalStr.split(",")
-                        val decimals = if (parts[1].length == 1) parts[1] + "0" else parts[1].take(2)
-                        "${parts[0]},$decimals"
-                    } else {
-                        "$totalStr,00"
-                    }
-                } else {
-                    baseValor
-                }
-            } catch (e: Exception) {
-                baseValor
-            }
-        } else {
-            baseValor
-        }
-    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -202,7 +184,7 @@ fun FinanceScreen(
                                     idconvenio = mens.idconvenio,
                                     dtvencimento = mens.dtvencimento,
                                     idmensalidade = mens.idmensalidade,
-                                    valorCartao = currentValorCartao,
+                                    valorCartao = null,
                                     valorTotal = totalValor
                                 )
                                 if (!pixResponse.pixCode.isNullOrEmpty()) {
@@ -235,7 +217,7 @@ fun FinanceScreen(
                                     idcontrato = mens.idcontrato,
                                     idconvenio = mens.idconvenio,
                                     idmensalidade = mens.idmensalidade,
-                                    valorCartao = currentValorCartao,
+                                    valorCartao = null,
                                     valorTotal = totalValor
                                 )
                                 if (boletoResponse.success) {
@@ -259,8 +241,7 @@ fun FinanceScreen(
                     }
                 },
                 showBoleto = selectedMensalidade?.boleto ?: oldestUnpaid?.boleto ?: showBoletoButton,
-                isProcessing = isGeneratingPayment,
-                acrescimoCartao = currentValorCartao
+                isProcessing = isGeneratingPayment
             )
 
             if (isLoading) {
@@ -286,6 +267,48 @@ fun FinanceScreen(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     item {
+                        if (WalletCache.pendingCardFee != null) {
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = BrandGreen.copy(alpha = 0.1f)
+                                ),
+                                border = BorderStroke(1.dp, BrandGreen.copy(alpha = 0.2f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CreditCard,
+                                        contentDescription = null,
+                                        tint = BrandGreen,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column {
+                                        Text(
+                                            text = "Taxa de Cartão Pendente",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = BrandGreen
+                                        )
+                                        Text(
+                                            text = "Uma cobrança de R$ ${WalletCache.pendingCardFee} foi adicionada à sua próxima mensalidade devido à emissão de um novo cartão.",
+                                            fontSize = 12.sp,
+                                            color = TextSecondary,
+                                            lineHeight = 16.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    item {
                         HistoryHeader(
                             years = years,
                             selectedYear = selectedYear,
@@ -294,13 +317,17 @@ fun FinanceScreen(
                     }
 
                     items(historyInvoices) { item ->
-                        val isFirstUnpaid = oldestUnpaid?.idmensalidade == item.idmensalidade
-                        val canSelect = item.pago || isFirstUnpaid
+                        val unpaidList = historyInvoices.filter { !it.pago }.sortedBy { parseDate(it.dtvencimento) }
+                        val isLocked = unpaidList.size >= 3 && item.idmensalidade == unpaidList[2].idmensalidade
+                        val isFirstTwoUnpaid = unpaidList.take(2).any { it.idmensalidade == item.idmensalidade }
+                        
+                        val canSelect = item.pago || isFirstTwoUnpaid
 
                         HistoryInvoiceItem(
                             item = item,
                             isSelected = selectedMensalidade?.idmensalidade == item.idmensalidade,
                             enabled = canSelect,
+                            isLocked = isLocked,
                             onClick = {
                                 if (!item.pago && canSelect) {
                                     selectedMensalidade = item
@@ -342,8 +369,7 @@ fun FinanceHeader(
     onPixClick: () -> Unit,
     onBoletoClick: () -> Unit,
     showBoleto: Boolean,
-    isProcessing: Boolean,
-    acrescimoCartao: String? = null
+    isProcessing: Boolean
 ) {
     Box(
         modifier = Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(BrandGreen, BrandGreenDark))).clip(RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp))
@@ -357,16 +383,6 @@ fun FinanceHeader(
             Spacer(modifier = Modifier.height(4.dp))
             Text(text = "R$ $valor", color = SurfaceWhite, fontSize = 38.sp, fontWeight = FontWeight.Bold)
             
-            if (!acrescimoCartao.isNullOrEmpty()) {
-                Text(
-                    text = "+ R$ $acrescimoCartao (Acréscimo Cartão)", 
-                    color = SurfaceWhite.copy(alpha = 0.9f), 
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                )
-            }
-
             Text(text = "Vencimento: $vencimento", color = SurfaceWhite.copy(alpha = 0.9f), fontSize = 14.sp)
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -431,9 +447,10 @@ fun HistoryInvoiceItem(
     item: MensalidadeItem, 
     isSelected: Boolean, 
     enabled: Boolean = true,
+    isLocked: Boolean = false,
     onClick: () -> Unit
 ) {
-    val statusColor = if (item.pago) BrandGreen else if (isSelected) BrandGreen else if (enabled) Color(0xFFD32F2F) else Color.Gray
+    val statusColor = if (item.pago) BrandGreen else if (isLocked) Color.Gray else if (isSelected) BrandGreen else if (enabled) Color(0xFFD32F2F) else Color.Gray
     
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -441,33 +458,56 @@ fun HistoryInvoiceItem(
         border = if (isSelected) BorderStroke(2.dp, BrandGreen) else null,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = enabled || item.pago) { onClick() }
-            .alpha(if (!item.pago && !enabled) 0.5f else 1f)
+            .clickable(enabled = (enabled || item.pago) && !isLocked) { onClick() }
+            .alpha(if (!item.pago && (!enabled || isLocked)) 0.5f else 1f)
     ) {
-        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(statusColor.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = if (item.pago) Icons.Default.CheckCircle else if (enabled) Icons.Default.PendingActions else Icons.Default.Lock, 
-                        contentDescription = null, 
-                        tint = statusColor, 
-                        modifier = Modifier.size(20.dp)
-                    )
+        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(statusColor.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (item.pago) Icons.Default.CheckCircle else if (isLocked) Icons.Default.Lock else if (enabled) Icons.Default.PendingActions else Icons.Default.Lock, 
+                            contentDescription = null, 
+                            tint = statusColor, 
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(text = "Mensalidade", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextPrimary)
+                        Text(text = if (item.pago) "Pago em ${item.dtpagamento}" else "Vencimento ${item.dtvencimento}", fontSize = 12.sp, color = TextSecondary)
+                    }
                 }
-                Spacer(modifier = Modifier.width(16.dp))
-                Column {
-                    Text(text = "Mensalidade", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextPrimary)
-                    Text(text = if (item.pago) "Pago em ${item.dtpagamento}" else "Vencimento ${item.dtvencimento}", fontSize = 12.sp, color = TextSecondary)
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(text = "R$ ${item.valormensalidade}", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextPrimary)
+                    if (!item.pago) {
+                        Text(
+                            text = if (isLocked) "BLOQUEADO" else if (enabled) "PENDENTE" else "BLOQUEADO", 
+                            fontSize = 10.sp, 
+                            fontWeight = FontWeight.Bold, 
+                            color = statusColor
+                        )
+                    }
                 }
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(text = "R$ ${item.valormensalidade}", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextPrimary)
-                if (!item.pago) {
+            
+            if (isLocked) {
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Info, 
+                        contentDescription = null, 
+                        tint = TextSecondary, 
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (enabled) "PENDENTE" else "BLOQUEADO", 
-                        fontSize = 10.sp, 
-                        fontWeight = FontWeight.Bold, 
-                        color = statusColor
+                        text = "Será liberada após o pagamento da pendente",
+                        fontSize = 11.sp,
+                        color = TextSecondary,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }

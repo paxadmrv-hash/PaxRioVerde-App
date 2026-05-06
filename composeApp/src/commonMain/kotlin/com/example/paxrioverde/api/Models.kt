@@ -150,3 +150,10 @@ data class PetActionResponse(
     @SerialName("success") val success: Boolean,
     @SerialName("message") val message: String
 )
+
+@Serializable
+data class GenericResponse(
+    @SerialName("success") val success: Boolean,
+    @SerialName("message") val message: String? = null,
+    @SerialName("statusCode") val statusCode: Int? = null
+)

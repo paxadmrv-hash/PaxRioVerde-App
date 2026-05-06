@@ -1,5 +1,6 @@
 package com.example.paxrioverde.ui.plans
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -108,7 +109,8 @@ fun PlansScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     IncludedItemCard(
                         title = "Assistência Funerária",
-                        desc = "Urna, Flores, Higienização, Kit Lanche e Capelas.",
+                        desc = "A PAX RIO VERDE oferece assistência funerária 24h e serviços conforme o plano contratado.",
+                        expandableContent = "O plano cobre urna mortuária; higienização e acondicionamento do ente querido; enfeites e acessórios; translado e carro funerário dentro do limite do plano; emissão de certidão de óbito; e itens de recepção (café, chá, copos). Assistência funerária 24 horas.",
                         icon = Icons.Outlined.Church
                     )
                     Row(
@@ -167,7 +169,7 @@ fun PlansScreen(
             item {
                 SectionTitleWidget("Dependentes Cadastrados")
                 Text(
-                    text = "Abaixo listamos os dependentes ativos em seu plano.",
+                    text = "Abaixo, os dependentes ativos do seu plano:",
                     fontSize = 12.sp,
                     color = Color.Gray,
                     modifier = Modifier.padding(bottom = 12.dp)
@@ -251,31 +253,73 @@ fun BentoCardHero(userPlano: String, valorMensalidade: String) {
 }
 
 @Composable
-fun IncludedItemCard(title: String, desc: String, icon: ImageVector) {
-    Row(
+fun IncludedItemCard(
+    title: String,
+    desc: String,
+    icon: ImageVector,
+    expandableContent: String? = null
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(SurfaceWhite)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .then(
+                if (expandableContent != null) Modifier.clickable { expanded = !expanded }
+                else Modifier
+            )
+            .padding(16.dp)
+            .animateContentSize()
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(SecondarySageGreen.copy(alpha = 0.2f)),
-            contentAlignment = Alignment.Center
+        Row(
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(icon, null, tint = PrimaryLimeGreen, modifier = Modifier.size(24.dp))
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(SecondarySageGreen.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, null, tint = PrimaryLimeGreen, modifier = Modifier.size(24.dp))
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextDark)
+                Text(desc, fontSize = 12.sp, color = Color.Gray, lineHeight = 14.sp)
+
+                if (expandableContent != null && !expanded) {
+                    Text(
+                        text = "Saiba mais",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PrimaryLimeGreen,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(
+                imageVector = Icons.Filled.CheckCircle,
+                contentDescription = null,
+                tint = PrimaryLimeGreen,
+                modifier = Modifier.size(20.dp)
+            )
         }
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = TextDark)
-            Text(desc, fontSize = 12.sp, color = Color.Gray, lineHeight = 14.sp)
+
+        if (expanded && expandableContent != null) {
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = SoftGrayBg)
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = expandableContent,
+                fontSize = 12.sp,
+                color = TextDark,
+                lineHeight = 16.sp
+            )
         }
-        Spacer(modifier = Modifier.width(8.dp))
-        Icon(Icons.Filled.CheckCircle, null, tint = PrimaryLimeGreen, modifier = Modifier.size(20.dp))
     }
 }
 

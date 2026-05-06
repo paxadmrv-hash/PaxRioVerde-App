@@ -329,8 +329,6 @@ fun CardContent(item: CartaoItem) {
                 )
             }
 
-            Spacer(modifier = Modifier.height(2.dp))
-
             // Linha 2: Contrato e Validade
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -481,7 +479,7 @@ fun GerarCartaoDialog(
                             onDismiss()
                             onNavigateToFinance()
                         }) {
-                            Text("VER FINANCEIRO", color = BrandLightGreen, fontWeight = FontWeight.Bold)
+                            Text("VER MENSALIDADE", color = BrandLightGreen, fontWeight = FontWeight.Bold)
                         }
                     }
                     Button(onClick = {
@@ -547,13 +545,16 @@ fun GerarCartaoDialog(
                                     val oldIds = WalletCache.cartoesList.map { it.idControle }.toSet()
                                     
                                     isSuccess = true
-                                    resultMessage = "Cartão gerado com sucesso! A cobrança de $valorFormatado foi lançada em seu financeiro."
+                                    resultMessage = "Cartão gerado com sucesso! A cobrança de $valorFormatado foi lançada na sua mensalidade."
                                     
-                                    // Registra o acréscimo pendente no cache para exibição na sessão
-                                    WalletCache.pendingCardFee = valorLimpo
+                                    // Limpa o cache para garantir que venha do servidor
+                                    WalletCache.clear() 
+
+                                    // Registra o acréscimo pendente no cache e storage para exibição persistente
+                                    // Usamos vírgula para manter o padrão visual do app
+                                    WalletCache.updatePendingCardFee(valorLimpo.replace(".", ","))
 
                                     // Recarrega cartões e notifica o App para atualizar dados do usuário
-                                    WalletCache.clear() // Limpa o cache para garantir que venha do servidor
                                     WalletCache.preLoad(idcliente, forceRefresh = true)
                                     
                                     // Tenta encontrar o novo cartão e aplica o estilo escolhido
@@ -629,46 +630,65 @@ fun GerarCartaoDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Seletor de Estilo Visual (Apenas visual, não afeta o 'tipo' enviado ao backend)
-                Text(
-                    "Estilo do Cartão",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Gray,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-                )
-
-                ExposedDropdownMenuBox(
-                    expanded = expandedEstilo,
-                    onExpandedChange = { expandedEstilo = !expandedEstilo }
-                ) {
-                    OutlinedTextField(
-                        value = selectedEstilo,
-                        onValueChange = {},
-                        readOnly = true,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedEstilo) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = BrandLightGreen,
-                            unfocusedBorderColor = Color.LightGray,
-                            focusedTextColor = Color.Black,
-                            unfocusedTextColor = Color.Black
-                        )
+                // Seletor de Estilo Visual (Apenas para Dependentes)
+                if (!isTitular) {
+                    Text(
+                        "Estilo do Cartão",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Gray,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                     )
 
-                    ExposedDropdownMenu(
+                    ExposedDropdownMenuBox(
                         expanded = expandedEstilo,
-                        onDismissRequest = { expandedEstilo = false }
+                        onExpandedChange = { expandedEstilo = !expandedEstilo }
                     ) {
-                        estilos.forEach { estilo ->
-                            DropdownMenuItem(
-                                text = { Text(estilo) },
-                                onClick = {
-                                    selectedEstilo = estilo
-                                    expandedEstilo = false
-                                }
+                        OutlinedTextField(
+                            value = selectedEstilo,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedEstilo) },
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = BrandLightGreen,
+                                unfocusedBorderColor = Color.LightGray,
+                                focusedTextColor = Color.Black,
+                                unfocusedTextColor = Color.Black
                             )
+                        )
+
+                        ExposedDropdownMenu(
+                            expanded = expandedEstilo,
+                            onDismissRequest = { expandedEstilo = false },
+                            modifier = Modifier.background(Color.White)
+                        ) {
+                            estilos.forEach { estilo ->
+                                val range = when (estilo) {
+                                    "Kids" -> " (Até 9 anos)"
+                                    "Teen" -> " (10 a 17 anos)"
+                                    else -> " (+18 anos)"
+                                }
+                                DropdownMenuItem(
+                                    text = { Text(estilo + range, color = Color.Black) },
+                                    onClick = {
+                                        selectedEstilo = estilo
+                                        expandedEstilo = false
+                                    },
+                                    colors = MenuDefaults.itemColors(
+                                        textColor = Color.Black,
+                                        trailingIconColor = BrandLightGreen
+                                    )
+                                )
+                            }
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                } else {
+                    // Se for titular, garante que o estilo seja Adulto
+                    LaunchedEffect(Unit) {
+                        selectedEstilo = "Adulto"
                     }
                 }
 
@@ -695,21 +715,27 @@ fun GerarCartaoDialog(
 
                         ExposedDropdownMenu(
                             expanded = expanded,
-                            onDismissRequest = { expanded = false }
+                            onDismissRequest = { expanded = false },
+                            modifier = Modifier.background(Color.White)
                         ) {
                             if (dependentesList.isEmpty()) {
                                 DropdownMenuItem(
-                                    text = { Text("Nenhum dependente encontrado") },
-                                    onClick = { }
+                                    text = { Text("Nenhum dependente encontrado", color = Color.Black) },
+                                    onClick = { },
+                                    colors = MenuDefaults.itemColors(textColor = Color.Black)
                                 )
                             } else {
                                 dependentesList.forEach { dep ->
                                     DropdownMenuItem(
-                                        text = { Text("${dep.nomeDependente} (${dep.parentesco})") },
+                                        text = { Text("${dep.nomeDependente} (${dep.parentesco})", color = Color.Black) },
                                         onClick = {
                                             selectedDependente = dep
                                             expanded = false
-                                        }
+                                        },
+                                        colors = MenuDefaults.itemColors(
+                                            textColor = Color.Black,
+                                            trailingIconColor = BrandLightGreen
+                                        )
                                     )
                                 }
                             }

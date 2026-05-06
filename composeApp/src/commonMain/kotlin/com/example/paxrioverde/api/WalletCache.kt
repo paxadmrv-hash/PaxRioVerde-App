@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
+import com.example.paxrioverde.util.SessionManager
 import kotlinx.coroutines.delay
 
 object WalletCache {
@@ -14,8 +15,16 @@ object WalletCache {
     val loadedBitmaps = mutableStateMapOf<Int, ImageBitmap>()
     var isPreloading by mutableStateOf(false)
     
-    // Rastreia se houve uma geração de cartão nesta sessão
-    var pendingCardFee by mutableStateOf<String?>(null)
+    private val sessionManager = SessionManager()
+
+    // Rastreia se houve uma geração de cartão nesta sessão ou em sessões anteriores (persistido)
+    var pendingCardFee by mutableStateOf<String?>(sessionManager.getPendingCardFee())
+        private set
+
+    fun updatePendingCardFee(fee: String?) {
+        pendingCardFee = fee
+        sessionManager.savePendingCardFee(fee)
+    }
 
     val totalValorCartoes: Double
         get() = cartoesList.sumOf { 
@@ -64,6 +73,6 @@ object WalletCache {
         cartoesList.clear()
         dependentesList.clear()
         loadedBitmaps.clear()
-        pendingCardFee = null
+        // Mantém pendingCardFee para persistir o aviso na sessão e no storage
     }
 }

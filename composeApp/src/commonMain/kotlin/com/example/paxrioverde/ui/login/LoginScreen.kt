@@ -73,7 +73,8 @@ class CpfVisualTransformation : VisualTransformation {
 @Composable
 fun LoginScreen(
     onLoginSuccess: (LoginResponse) -> Unit,
-    onFirstAccessClick: () -> Unit
+    onFirstAccessClick: () -> Unit,
+    onForgotPasswordClick: () -> Unit
 ) {
     val sessionManager = remember { SessionManager() }
     var cpf by remember { mutableStateOf("") }
@@ -154,17 +155,27 @@ fun LoginScreen(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Checkbox(
-                        checked = rememberMe,
-                        onCheckedChange = { rememberMe = it },
-                        colors = CheckboxDefaults.colors(checkedColor = BrandGreen)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = rememberMe,
+                            onCheckedChange = { rememberMe = it },
+                            colors = CheckboxDefaults.colors(checkedColor = BrandGreen)
+                        )
+                        Text(
+                            text = "Lembrar login",
+                            fontSize = 14.sp,
+                            modifier = Modifier.clickable { rememberMe = !rememberMe }
+                        )
+                    }
                     Text(
-                        text = "Lembrar meu login",
+                        text = "Esqueci a senha",
                         fontSize = 14.sp,
-                        modifier = Modifier.clickable { rememberMe = !rememberMe }
+                        color = BrandGreen,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable { onForgotPasswordClick() }
                     )
                 }
 
@@ -258,7 +269,7 @@ fun LoginScreen(
                     fontSize = 14.sp,
                     color = BrandGreen,
                     modifier = Modifier.clickable {
-                        uriHandler.openUri("https://wa.me/556436203131")
+                        uriHandler.openUri("https://wa.me/556492331101")
                     }
                 )
             }

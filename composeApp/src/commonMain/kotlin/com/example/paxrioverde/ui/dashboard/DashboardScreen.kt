@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.paxrioverde.api.LoginResponse
+import com.example.paxrioverde.util.BillingNotificationManager
+import com.example.paxrioverde.util.getNotificationScheduler
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.painterResource
 import paxrioverde.composeapp.generated.resources.*
@@ -55,6 +57,15 @@ fun DashboardScreen(
     onOpenDrawer: () -> Unit
 ) {
     var expandedImageRes by remember { mutableStateOf<org.jetbrains.compose.resources.DrawableResource?>(null) }
+
+    LaunchedEffect(userData?.prox_mens) {
+        userData?.prox_mens?.let { dueDate ->
+            if (dueDate.isNotEmpty() && dueDate != "--/--/----") {
+                BillingNotificationManager.scheduleBillingNotifications(dueDate)
+                getNotificationScheduler().requestPermission()
+            }
+        }
+    }
 
     LazyColumn(
         modifier = Modifier

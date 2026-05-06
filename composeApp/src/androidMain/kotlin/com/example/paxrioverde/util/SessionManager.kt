@@ -20,4 +20,13 @@ actual class SessionManager actual constructor() {
 
     actual fun getSavedPetsJson(): String = prefs.getString("saved_pets_json", "") ?: ""
     actual fun savePetsJson(json: String) = prefs.edit().putString("saved_pets_json", json).apply()
+
+    actual fun getPendingCardFee(): String? = prefs.getString("pending_card_fee", null)
+    actual fun savePendingCardFee(fee: String?) {
+        if (fee == null) {
+            prefs.edit().remove("pending_card_fee").apply()
+        } else {
+            prefs.edit().putString("pending_card_fee", fee).apply()
+        }
+    }
 }

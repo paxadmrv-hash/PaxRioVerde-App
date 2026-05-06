@@ -13,6 +13,7 @@ import com.example.paxrioverde.ui.dashboard.DashboardScreen
 import com.example.paxrioverde.ui.finance.FinanceScreen
 import com.example.paxrioverde.ui.laboratorio.ExamesLaboratoriaisScreen
 import com.example.paxrioverde.ui.login.FirstAccessScreen
+import com.example.paxrioverde.ui.login.ForgotPasswordScreen
 import com.example.paxrioverde.ui.login.LoginScreen
 import com.example.paxrioverde.ui.notifications.NotificationsScreen
 import com.example.paxrioverde.ui.pet.MundoPetScreen
@@ -41,11 +42,12 @@ enum class Screen {
     Referral,
     VirtualCard,
     Laboratorio,
-    MedSaude
+    MedSaude,
+    ForgotPassword
 }
 
 @Composable
-fun App() {
+fun App(initialScreen: Screen? = null) {
     // Gerenciamento manual de pilha para suportar o "Voltar"
     var navigationStack by remember { mutableStateOf(listOf(Screen.Splash)) }
     val currentScreen = navigationStack.last()
@@ -57,8 +59,19 @@ fun App() {
     val scope = rememberCoroutineScope()
     val sessionManager = remember { SessionManager() }
 
+    // Função para navegar para uma nova tela (adiciona à pilha)
+    fun navigateTo(screen: Screen, clearStack: Boolean = false) {
+        if (clearStack) {
+            navigationStack = listOf(screen)
+        } else {
+            if (navigationStack.lastOrNull() != screen) {
+                navigationStack = navigationStack + screen
+            }
+        }
+    }
+
     // Efeito para Auto-Login quando o App abre e já tem dados salvos
-    fun refreshUserData() {
+    fun refreshUserData(onComplete: () -> Unit = {}) {
         val savedCpf = sessionManager.getSavedCpf()
         val savedPass = sessionManager.getSavedPassword()
         if (savedCpf.isNotEmpty() && savedPass.isNotEmpty()) {
@@ -67,6 +80,7 @@ fun App() {
                     val response = ApiService.login(savedCpf, savedPass)
                     if (response.success) {
                         userData = response
+                        onComplete()
                     }
                 } catch (e: Exception) {
                     println("Erro ao atualizar dados: ${e.message}")
@@ -77,19 +91,15 @@ fun App() {
 
     LaunchedEffect(Unit) {
         if (!isAutoLoginDone) {
-            refreshUserData()
-            isAutoLoginDone = true
-        }
-    }
-
-    // Função para navegar para uma nova tela (adiciona à pilha)
-    fun navigateTo(screen: Screen, clearStack: Boolean = false) {
-        if (clearStack) {
-            navigationStack = listOf(screen)
-        } else {
-            if (navigationStack.lastOrNull() != screen) {
-                navigationStack = navigationStack + screen
+            refreshUserData {
+                // Se houver uma tela inicial pendente (vinda de notificação), navega após login
+                initialScreen?.let {
+                    if (it != Screen.Splash) {
+                        navigateTo(it)
+                    }
+                }
             }
+            isAutoLoginDone = true
         }
     }
 
@@ -116,9 +126,13 @@ fun App() {
                     userData = response
                     navigateTo(Screen.Dashboard, clearStack = true)
                 },
-                onFirstAccessClick = { navigateTo(Screen.FirstAccess) }
+                onFirstAccessClick = { navigateTo(Screen.FirstAccess) },
+                onForgotPasswordClick = { navigateTo(Screen.ForgotPassword) }
             )
             Screen.FirstAccess -> FirstAccessScreen(
+                onBack = { goBack() }
+            )
+            Screen.ForgotPassword -> ForgotPasswordScreen(
                 onBack = { goBack() }
             )
             else -> {

@@ -201,7 +201,7 @@ fun FirstAccessScreen(onBack: () -> Unit) {
                     Spacer(modifier = Modifier.height(24.dp))
                     
                     TextButton(onClick = {
-                        val whatsappAjuda = "5564992784186"
+                        val whatsappAjuda = "556492331101"
                         val msg = "Olá, preciso de ajuda com o primeiro acesso no aplicativo."
                         uriHandler.openUri("https://wa.me/$whatsappAjuda?text=${urlEncode(msg)}")
                     }) {

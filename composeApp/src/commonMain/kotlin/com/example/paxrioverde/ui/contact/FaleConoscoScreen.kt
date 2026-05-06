@@ -44,6 +44,7 @@ fun FaleConoscoScreen(onBackClick: () -> Unit) {
     val scrollState = rememberScrollState()
     val uriHandler = LocalUriHandler.current
     val enderecoSede = "R. Joaquim Vaz do Nascimento, 154, Centro, Rio Verde - GO"
+    val enderecoFuneraria = "Rua Major Oscar Campos, 454 - Setor Central, Rio Verde-GO"
 
     Scaffold(
         containerColor = LightBackground,
@@ -99,26 +100,37 @@ fun FaleConoscoScreen(onBackClick: () -> Unit) {
 
                 InfoCard(
                     icon = Icons.Default.LocationOn,
-                    title = "Endereço",
+                    title = "Pax Rio Verde - Sede Administrativa",
                     modifier = Modifier.clickable {
                         uriHandler.openUri("https://www.google.com/maps/search/?api=1&query=${urlEncode(enderecoSede)}")
                     }
                 ) {
-                    Text("Grupo Universo - Sede Administrativa", fontWeight = FontWeight.SemiBold, color = Color(0xFF333333))
                     Text("R. Joaquim Vaz do Nascimento, 154 - Centro", color = Color.Gray)
                     Text("Rio Verde - GO, 75901-220", color = Color.Gray)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Horário de Atendimento", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    ScheduleRow("Segunda a Sexta", "07:00 - 18:00")
+                    ScheduleRow("Sábado", "07:00 - 12:00")
                     Spacer(modifier = Modifier.height(4.dp))
                     Text("Toque para abrir no Google Maps", color = BrandGreenMain, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
 
-                InfoCard(Icons.Default.DateRange, "Horário de Atendimento") {
-                    ScheduleRow("Segunda a Sexta", "07:00 - 18:00")
-                    ScheduleRow("Sábado", "07:00 - 12:00")
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color(0xFFEEEEEE))
+                InfoCard(
+                    icon = Icons.Default.LocationOn,
+                    title = "Endereço da Funerária",
+                    modifier = Modifier.clickable {
+                        uriHandler.openUri("https://www.google.com/maps/search/?api=1&query=${urlEncode(enderecoFuneraria)}")
+                    }
+                ) {
+                    Text("Rua Major Oscar Campos, 454 - Setor Central", color = Color.Gray)
+                    Text("Rio Verde - GO", color = Color.Gray)
+                    Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Plantão 24h", fontWeight = FontWeight.Bold)
                         Text("Sempre disponível", color = BrandGreenMain, fontWeight = FontWeight.Bold)
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Toque para abrir no Google Maps", color = BrandGreenMain, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
                 Spacer(modifier = Modifier.height(80.dp))
             }

@@ -1,5 +1,6 @@
 package com.example.paxrioverde
 
+import android.content.Intent
 import android.os.Build
 
 class AndroidPlatform : Platform {
@@ -7,3 +8,7 @@ class AndroidPlatform : Platform {
 }
 
 actual fun getPlatform(): Platform = AndroidPlatform()
+
+fun getInitialNavigation(intent: Intent?): String? {
+    return intent?.getStringExtra("navigate_to")
+}
