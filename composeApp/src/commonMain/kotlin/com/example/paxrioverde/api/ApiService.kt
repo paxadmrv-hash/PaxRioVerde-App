@@ -290,14 +290,19 @@ object ApiService {
         }.body()
     }
 
-    suspend fun redefinirSenha(cpf: String, token: String, senha: String): GenericResponse {
+    suspend fun redefinirSenha(cpfOrEmail: String, token: String, senha: String): GenericResponse {
         return client.post("redefinir_senha_app") {
             setBody(FormDataContent(Parameters.build {
-                val digits = if (cpf.contains("@")) cpf else cpf.filter { it.isDigit() }
-                append("cpf", digits)
+                if (cpfOrEmail.contains("@")) {
+                    append("email", cpfOrEmail)
+                    append("login", cpfOrEmail)
+                } else {
+                    val digits = cpfOrEmail.filter { it.isDigit() }
+                    append("cpf", digits)
+                    append("login", digits)
+                }
                 append("token", token)
                 append("senha", senha)
-                append("login", digits)
                 append("password", senha)
                 append("codigo", token)
             }))

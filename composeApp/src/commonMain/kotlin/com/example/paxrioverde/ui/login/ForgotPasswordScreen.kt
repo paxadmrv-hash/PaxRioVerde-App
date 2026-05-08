@@ -108,7 +108,7 @@ fun ForgotPasswordScreen(onBack: () -> Unit) {
         scope.launch {
             try {
                 val response = ApiService.redefinirSenha(
-                    cpf = cpfOrEmail, 
+                    cpfOrEmail = cpfOrEmail,
                     token = token,
                     senha = newPassword
                 )

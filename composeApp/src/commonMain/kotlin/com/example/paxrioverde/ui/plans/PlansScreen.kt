@@ -110,7 +110,7 @@ fun PlansScreen(
                     IncludedItemCard(
                         title = "Assistência Funerária",
                         desc = "A PAX RIO VERDE oferece assistência funerária 24h e serviços conforme o plano contratado.",
-                        expandableContent = "O plano cobre urna mortuária; higienização e acondicionamento do ente querido; enfeites e acessórios; translado e carro funerário dentro do limite do plano; emissão de certidão de óbito; e itens de recepção (café, chá, copos). Assistência funerária 24 horas.",
+                        expandableContent = "O plano cobre urna mortuária; higienização e acondicionamento do ente querido; enfeites e acessórios; translado e carro funerário dentro do limite do plano e itens de recepção (café, chá, copos). Assistência funerária 24 horas.",
                         icon = Icons.Outlined.Church
                     )
                     Row(
