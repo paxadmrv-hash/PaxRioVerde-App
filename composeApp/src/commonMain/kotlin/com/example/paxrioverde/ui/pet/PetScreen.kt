@@ -77,11 +77,18 @@ data class PetPartner(val name: String, val discount: String, val address: Strin
 
 val petPartners = listOf(
     PetPartner(
-        name = "Clínica Veterinária Rio Verde",
-        discount = "• 10% à vista (pix ou dinheiro), 5% no débito e 3% no crédito NAS CONSULTAS E CIRURGIAS\n\n• 7% à vista (pix ou dinheiro), 5% no débito e 3% no crédito NAS MEDICAÇÕES.",
+        name = "CLÍNICA VETERINÁRIA RIO VERDE",
+        discount = "• 10% de desconto à vista (dinheiro ou pix), 5% (débito) e 3% (crédito) em consulta e cirurgia;\n\n• 7% de desconto à vista (dinheiro ou pix) 5% (débito) e 3% (crédito) em medicações.",
         address = "Rua Rio Verde N°240 - Vila Maria",
         phone = "(64) 99255-4900",
         icon = Icons.Default.LocalHospital
+    ),
+    PetPartner(
+        name = "CLÍNICA VETERINÁRIA AGRO RAÇA",
+        discount = "• 5% de desconto no valor total.",
+        address = "Rio Verde - GO",
+        phone = "(64) 99204-2313",
+        icon = Icons.Default.Pets
     )
 )
 
