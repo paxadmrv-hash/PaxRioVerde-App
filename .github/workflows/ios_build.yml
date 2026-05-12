@@ -5,6 +5,7 @@ on:
     branches: [ main, master ]
 
 env:
+  # Garante compatibilidade com as ferramentas mais novas de 2026
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
@@ -13,6 +14,29 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Force Xcode 26 (iOS 26 SDK)
+        run: |
+          echo "🔍 Localizando versões do Xcode instaladas..."
+          ls -d /Applications/Xcode*.app
+          
+          # Tentativa de localizar o Xcode 26 pelo caminho padrão do GitHub em 2026
+          XCODE_PATH="/Applications/Xcode_26.app/Contents/Developer"
+          
+          if [ ! -d "$XCODE_PATH" ]; then
+            echo "⚠️ Caminho padrão não encontrado, buscando qualquer Xcode 26 disponível..."
+            XCODE_PATH=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | tail -n 1)"/Contents/Developer"
+          fi
+
+          if [ -d "$XCODE_PATH" ]; then
+            echo "✅ Xcode 26 localizado em: $XCODE_PATH"
+            sudo xcode-select -s "$XCODE_PATH"
+          else
+            echo "❌ ERRO: Xcode 26 não encontrado. Verifique se o Runner macos-latest já possui esta versão."
+            exit 1
+          fi
+          
+          xcodebuild -version
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -51,6 +75,13 @@ jobs:
           chmod +x gradlew
           ./gradlew clean assembleRelease
 
+      - name: Generate New Build Number
+        run: |
+          # Somamos 25 ao número da execução para garantir que supere a versão 9 que deu erro
+          NEW_BUILD_NUMBER=$(( ${{ github.run_number }} + 25 ))
+          echo "BUILD_NUMBER=$NEW_BUILD_NUMBER" >> $GITHUB_ENV
+          echo "🚀 Build Number definido para: $NEW_BUILD_NUMBER"
+
       - name: Build iOS Archive
         run: |
           xcodebuild -project iosApp/iosApp.xcodeproj \
@@ -61,8 +92,10 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             PROVISIONING_PROFILE_SPECIFIER=${{ env.PROVISIONING_PROFILE_UUID }} \
+            CURRENT_PROJECT_VERSION=${{ env.BUILD_NUMBER }} \
             ALLOW_PROVISIONING_DEVICE_REGISTRATION=NO \
-            ALLOW_PROVISIONING_UPDATES=NO
+            ALLOW_PROVISIONING_UPDATES=NO \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO
 
       - name: Export IPA
         run: |
@@ -101,7 +134,6 @@ jobs:
           API_KEY_CONTENT: ${{ secrets.APP_STORE_API_KEY_CONTENT }}
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
-          # O uso de EOF garante a preservação exata do formato da chave p8
           cat <<EOF > ~/.appstoreconnect/private_keys/AuthKey_$API_KEY_ID.p8
           $API_KEY_CONTENT
           EOF
