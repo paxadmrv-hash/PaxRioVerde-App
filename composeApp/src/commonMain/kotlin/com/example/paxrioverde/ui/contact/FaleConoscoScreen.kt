@@ -197,22 +197,10 @@ fun ContactCard(icon: ImageVector, title: String, detail: String, isWhatsApp: Bo
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .background(
-                        if (isWhatsApp) WhatsAppGreen.copy(alpha = 0.1f) else Color(0xFFF2F2F2),
-                        CircleShape
-                    ),
+                    .background(Color(0xFFF2F2F2), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                if (isWhatsApp) {
-                    Image(
-                        painter = painterResource(Res.drawable.ic_whatsapp_social),
-                        contentDescription = null,
-                        colorFilter = ColorFilter.tint(WhatsAppGreen),
-                        modifier = Modifier.size(24.dp)
-                    )
-                } else {
-                    Icon(icon, null, tint = Color.DarkGray, modifier = Modifier.size(22.dp))
-                }
+                Icon(icon, null, tint = Color.DarkGray, modifier = Modifier.size(22.dp))
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
