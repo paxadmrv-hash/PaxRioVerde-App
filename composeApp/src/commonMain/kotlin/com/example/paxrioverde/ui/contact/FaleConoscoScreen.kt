@@ -71,8 +71,8 @@ fun FaleConoscoScreen(onBackClick: () -> Unit) {
                 }
 
                 SectionTitle(icon = Icons.Default.Phone, title = "WhatsApp")
-                ContactCard(Icons.Default.Phone, "WhatsApp Comercial", "(64) 9278-4186", isWhatsApp = true) {
-                    uriHandler.openUri("https://wa.me/556481460004")
+                ContactCard(Icons.Default.Phone, "WhatsApp Comercial", "(64) 98146-0004", isWhatsApp = true) {
+                    uriHandler.openUri("https://wa.me/5564981460004")
                 }
                 ContactCard(Icons.Default.Phone, "WhatsApp Funerária (Plantão 24h)", "(64) 98403-9405", isWhatsApp = true) {
                     uriHandler.openUri("https://wa.me/5564984039405")
@@ -194,8 +194,25 @@ fun ContactCard(icon: ImageVector, title: String, detail: String, isWhatsApp: Bo
         elevation = CardDefaults.cardElevation(1.dp)
     ) {
         Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(44.dp).background(Color(0xFFF2F2F2), CircleShape), contentAlignment = Alignment.Center) {
-                Icon(icon, null, tint = Color.DarkGray, modifier = Modifier.size(22.dp))
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(
+                        if (isWhatsApp) WhatsAppGreen.copy(alpha = 0.1f) else Color(0xFFF2F2F2),
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isWhatsApp) {
+                    Image(
+                        painter = painterResource(Res.drawable.ic_whatsapp_social),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(WhatsAppGreen),
+                        modifier = Modifier.size(24.dp)
+                    )
+                } else {
+                    Icon(icon, null, tint = Color.DarkGray, modifier = Modifier.size(22.dp))
+                }
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {

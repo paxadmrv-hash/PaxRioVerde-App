@@ -8,6 +8,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Pets
@@ -96,7 +97,7 @@ fun DashboardScreen(
                 Text(text = "Acesso Rápido", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextDark, modifier = Modifier.padding(bottom = 12.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     QuickActionItem(icon = Icons.Outlined.CreditCard, label = "Carteira", onClick = onOpenWallet)
-                    QuickActionItem(icon = Icons.Outlined.Receipt, label = "Mensalidades", onClick = onOpenBoleto)
+                    QuickActionItem(icon = Icons.AutoMirrored.Outlined.ReceiptLong, label = "Mensalidades", onClick = onOpenBoleto)
                     QuickActionItem(icon = Icons.Outlined.CardGiftcard, label = "Vantagens", onClick = onOpenBenefits)
                     QuickActionItem(icon = Icons.Outlined.PersonAdd, label = "Indicar", onClick = onOpenReferral)
                 }

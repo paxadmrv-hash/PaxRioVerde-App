@@ -274,6 +274,17 @@ fun LoginScreen(
                 )
             }
         }
+
+        // Assinatura no rodapé (fora do Card para não afetar o layout interno)
+        Text(
+            text = "© 2026 Pax Rio Verde | Desenvolvido pelo T.I. Interno",
+            fontSize = 10.sp,
+            color = Color.White.copy(alpha = 0.7f),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 32.dp)
+                .safeDrawingPadding() // Garante visibilidade em áreas seguras (iOS/Android)
+        )
     }
 }
 

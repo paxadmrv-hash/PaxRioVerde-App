@@ -7,7 +7,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -39,9 +41,9 @@ fun AppDrawer(
     val drawerItems = remember {
         listOf(
             DrawerMenuItem(Icons.Default.Home, "Início", Screen.Dashboard),
-            DrawerMenuItem(Icons.Default.DateRange, "Boletos", Screen.Finance),
-            DrawerMenuItem(Icons.Default.Description, "Meu Plano", Screen.Plans),
-            DrawerMenuItem(Icons.Default.Call, "Fale Conosco", Screen.Contact)
+            DrawerMenuItem(Icons.AutoMirrored.Outlined.ReceiptLong, "Mensalidades", Screen.Finance),
+            DrawerMenuItem(Icons.Outlined.Description, "Meu Plano", Screen.Plans),
+            DrawerMenuItem(Icons.Outlined.SupportAgent, "Fale Conosco", Screen.Contact)
         )
     }
 
