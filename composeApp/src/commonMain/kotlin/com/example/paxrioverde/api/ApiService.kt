@@ -117,26 +117,27 @@ object ApiService {
         valorCartao: String? = null,
         valorTotal: String? = null
     ): BoletoResponse {
-        return client.post("boleto_app") {
-            setBody(FormDataContent(Parameters.build {
-                append("idcontrato", idcontrato.toString())
-                append("idconvenio", idconvenio.toString())
-                append("idmensalidade", idmensalidade.toString())
-                append("id_mensalidade", idmensalidade.toString())
+        return client.get("boleto") {
+            url {
+                parameters.append("idcontrato", idcontrato.toString())
+                parameters.append("idconvenio", idconvenio.toString())
+                parameters.append("idmensalidade", idmensalidade.toString())
+                parameters.append("id_mensalidade", idmensalidade.toString())
                 
                 if (!valorCartao.isNullOrEmpty() && valorCartao != "0,00" && valorCartao != "0.00") {
                     val formattedValor = valorCartao.replace(",", ".")
-                    append("valor_cartao", formattedValor)
-                    append("valor_cartao_adicional", formattedValor)
-                    append("add_valor", formattedValor)
-                    append("VALOR_CARTAO", formattedValor)
+                    parameters.append("valor_cartao", formattedValor)
+                    parameters.append("valor_cartao_adicional", formattedValor)
+                    parameters.append("add_valor", formattedValor)
+                    parameters.append("VALOR_CARTAO", formattedValor)
                 }
 
                 if (!valorTotal.isNullOrEmpty()) {
-                    append("valor", valorTotal.replace(",", "."))
-                    append("VALOR", valorTotal.replace(",", "."))
+                    val formattedTotal = valorTotal.replace(",", ".")
+                    parameters.append("valor", formattedTotal)
+                    parameters.append("VALOR", formattedTotal)
                 }
-            }))
+            }
         }.body()
     }
 
