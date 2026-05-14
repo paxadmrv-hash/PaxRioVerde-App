@@ -214,13 +214,16 @@ fun FinanceScreen(
                         scope.launch {
                             isGeneratingPayment = true
                             try {
+                                val mesAnoFormatted = try {
+                                    val parts = mens.dtvencimento.split("/")
+                                    if (parts.size == 3) parts[1] + parts[2] else ""
+                                } catch (e: Exception) { "" }
+
                                 val boletoResponse = ApiService.getBoleto(
                                     idcontrato = mens.idcontrato,
-                                    idconvenio = mens.idconvenio,
-                                    idmensalidade = mens.idmensalidade,
-                                    valorCartao = null,
-                                    valorTotal = totalValor,
-                                    cpf = cpf
+                                    mesAno = mesAnoFormatted,
+                                    cpf = cpf,
+                                    valorTotal = totalValor
                                 )
                                 if (boletoResponse.success) {
                                     barCode = boletoResponse.codigoBarra ?: "Boleto disponível no PDF"

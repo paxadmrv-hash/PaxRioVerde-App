@@ -111,33 +111,19 @@ object ApiService {
     }
 
     suspend fun getBoleto(
-        idcontrato: Int, 
-        idconvenio: Int, 
-        idmensalidade: Int, 
-        valorCartao: String? = null,
-        valorTotal: String? = null,
-        cpf: String? = null
+        idcontrato: Int,
+        mesAno: String,
+        cpf: String? = null,
+        valorTotal: String? = null
     ): BoletoResponse {
         return client.get("boleto") {
             url {
-                parameters.append("idcontrato", idcontrato.toString())
-                parameters.append("idconvenio", idconvenio.toString())
-                parameters.append("idmensalidade", idmensalidade.toString())
-                parameters.append("id_mensalidade", idmensalidade.toString())
-                
-                cpf?.let { parameters.append("cpf", it) }
-                
-                if (!valorCartao.isNullOrEmpty() && valorCartao != "0,00" && valorCartao != "0.00") {
-                    val formattedValor = valorCartao.replace(",", ".")
-                    parameters.append("valor_cartao", formattedValor)
-                    parameters.append("valor_cartao_adicional", formattedValor)
-                    parameters.append("add_valor", formattedValor)
-                    parameters.append("VALOR_CARTAO", formattedValor)
-                }
+                parameters.append("IDCONTRATO", idcontrato.toString())
+                parameters.append("MESANO", mesAno)
+                cpf?.let { parameters.append("CPF", it) }
 
                 if (!valorTotal.isNullOrEmpty()) {
                     val formattedTotal = valorTotal.replace(",", ".")
-                    parameters.append("valor", formattedTotal)
                     parameters.append("VALOR", formattedTotal)
                 }
             }
