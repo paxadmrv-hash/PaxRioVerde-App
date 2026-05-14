@@ -115,7 +115,8 @@ object ApiService {
         idconvenio: Int, 
         idmensalidade: Int, 
         valorCartao: String? = null,
-        valorTotal: String? = null
+        valorTotal: String? = null,
+        cpf: String? = null
     ): BoletoResponse {
         return client.get("boleto") {
             url {
@@ -123,6 +124,8 @@ object ApiService {
                 parameters.append("idconvenio", idconvenio.toString())
                 parameters.append("idmensalidade", idmensalidade.toString())
                 parameters.append("id_mensalidade", idmensalidade.toString())
+                
+                cpf?.let { parameters.append("cpf", it) }
                 
                 if (!valorCartao.isNullOrEmpty() && valorCartao != "0,00" && valorCartao != "0.00") {
                     val formattedValor = valorCartao.replace(",", ".")

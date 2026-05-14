@@ -204,7 +204,8 @@ fun App(initialScreen: Screen? = null) {
                                     valorProxMens = userData?.valormens_prox_mens ?: "0,00",
                                     vencProxMens = userData?.prox_mens ?: "--/--/----",
                                     showBoletoButton = userData?.boleto_prox_mens ?: false,
-                                    valorCartao = displayValorCartao
+                                    valorCartao = displayValorCartao,
+                                    cpf = userData?.cpf
                                 )
                             }
                             Screen.Notifications -> {

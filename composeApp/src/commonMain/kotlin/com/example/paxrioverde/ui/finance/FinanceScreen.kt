@@ -67,7 +67,8 @@ fun FinanceScreen(
     valorProxMens: String = "0,00",
     vencProxMens: String = "--/--/----",
     showBoletoButton: Boolean = true,
-    valorCartao: String? = null
+    valorCartao: String? = null,
+    cpf: String? = null
 ) {
     var selectedMensalidade by remember { mutableStateOf<MensalidadeItem?>(null) }
     
@@ -218,7 +219,8 @@ fun FinanceScreen(
                                     idconvenio = mens.idconvenio,
                                     idmensalidade = mens.idmensalidade,
                                     valorCartao = null,
-                                    valorTotal = totalValor
+                                    valorTotal = totalValor,
+                                    cpf = cpf
                                 )
                                 if (boletoResponse.success) {
                                     barCode = boletoResponse.codigoBarra ?: "Boleto disponível no PDF"
