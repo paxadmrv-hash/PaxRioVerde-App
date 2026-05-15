@@ -77,6 +77,9 @@ fun FaleConoscoScreen(onBackClick: () -> Unit) {
                 ContactCard(Icons.Default.Phone, "WhatsApp Funerária (Plantão 24h)", "(64) 98403-9405", isWhatsApp = true) {
                     uriHandler.openUri("https://wa.me/5564984039405")
                 }
+                ContactCard(Icons.Default.Phone, "Suporte ao Aplicativo", "(64) 9233-1101", isWhatsApp = true) {
+                    uriHandler.openUri("https://wa.me/556492331101")
+                }
 
                 Text("Redes Sociais", fontWeight = FontWeight.Bold, color = Color.DarkGray, modifier = Modifier.padding(top = 8.dp, start = 8.dp))
 

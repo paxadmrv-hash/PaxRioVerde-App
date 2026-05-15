@@ -282,8 +282,9 @@ fun LoginScreen(
             color = Color.White.copy(alpha = 0.7f),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 32.dp)
-                .safeDrawingPadding() // Garante visibilidade em áreas seguras (iOS/Android)
+                .padding(bottom = 48.dp)
+                // Removemos o safeDrawingPadding e ignoramos insets do teclado
+                .windowInsetsPadding(WindowInsets.statusBars)
         )
     }
 }

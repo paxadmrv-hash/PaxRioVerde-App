@@ -40,7 +40,7 @@ fun AppDrawer(
 ) {
     val drawerItems = remember {
         listOf(
-            DrawerMenuItem(Icons.Default.Home, "Início", Screen.Dashboard),
+            DrawerMenuItem(Icons.Outlined.Home, "Início", Screen.Dashboard),
             DrawerMenuItem(Icons.AutoMirrored.Outlined.ReceiptLong, "Mensalidades", Screen.Finance),
             DrawerMenuItem(Icons.Outlined.Description, "Meu Plano", Screen.Plans),
             DrawerMenuItem(Icons.Outlined.SupportAgent, "Fale Conosco", Screen.Contact)
@@ -79,7 +79,7 @@ fun AppDrawer(
                         modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Person,
+                            imageVector = Icons.Outlined.Person,
                             contentDescription = null,
                             tint = BrandLime,
                             modifier = Modifier.padding(10.dp)

@@ -37,6 +37,7 @@ import com.example.paxrioverde.api.WalletCache
 import com.example.paxrioverde.ui.notifications.NotificationCenter
 import com.example.paxrioverde.ui.notifications.NotificationType
 import com.example.paxrioverde.util.AppConstants
+import com.example.paxrioverde.util.SessionManager
 import kotlinx.coroutines.launch
 import kotlinx.datetime.*
 
@@ -67,8 +68,7 @@ fun FinanceScreen(
     valorProxMens: String = "0,00",
     vencProxMens: String = "--/--/----",
     showBoletoButton: Boolean = true,
-    valorCartao: String? = null,
-    cpf: String? = null
+    valorCartao: String? = null
 ) {
     var selectedMensalidade by remember { mutableStateOf<MensalidadeItem?>(null) }
     
@@ -77,6 +77,7 @@ fun FinanceScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val sessionManager = remember { SessionManager() }
 
     LaunchedEffect(idcliente) {
         if (idcliente != 0) {
@@ -144,7 +145,10 @@ fun FinanceScreen(
             // 3. Mostrar se estiver vencida (mês anterior ou anos anteriores)
             val date = parseDate(item.dtvencimento) ?: return@filter true
             date.year < today.year || (date.year == today.year && date.monthNumber <= today.monthNumber)
-        }.sortedBy { parseDate(it.dtvencimento) }
+        }.sortedWith(
+            compareBy<MensalidadeItem> { it.pago } // Pendentes (false) primeiro
+                .thenBy { parseDate(it.dtvencimento) } // Ordem cronológica
+        )
     }
 
     var showPixDialog by remember { mutableStateOf(false) }
@@ -167,7 +171,6 @@ fun FinanceScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(bottom = padding.calculateBottomPadding())
-                .navigationBarsPadding()
         ) {
             FinanceHeader(
                 onBackClick = onBackClick,
@@ -214,18 +217,22 @@ fun FinanceScreen(
                         scope.launch {
                             isGeneratingPayment = true
                             try {
-                                val mesAnoFormatted = try {
-                                    val parts = mens.dtvencimento.split("/")
-                                    if (parts.size == 3) parts[1] + parts[2] else ""
-                                } catch (e: Exception) { "" }
+                                val dateParts = mens.dtvencimento.split("/")
+                                val mesAno = if (dateParts.size == 3) {
+                                    "${dateParts[1]}${dateParts[2]}"
+                                } else ""
+                                val cpf = sessionManager.getSavedCpf()
 
                                 val boletoResponse = ApiService.getBoleto(
                                     idcontrato = mens.idcontrato,
-                                    mesAno = mesAnoFormatted,
+                                    idconvenio = mens.idconvenio,
+                                    idmensalidade = mens.idmensalidade,
                                     cpf = cpf,
+                                    mesano = mesAno,
+                                    valorCartao = null,
                                     valorTotal = totalValor
                                 )
-                                if (boletoResponse.success) {
+                                if (boletoResponse.status == null) {
                                     barCode = boletoResponse.codigoBarra ?: "Boleto disponível no PDF"
                                     showBoletoDialog = true
                                     
@@ -235,7 +242,7 @@ fun FinanceScreen(
                                         type = NotificationType.PAYMENT
                                     )
                                 } else {
-                                    errorMessage = boletoResponse.mesAno ?: "Erro ao carregar boleto"
+                                    errorMessage = boletoResponse.status ?: "Erro ao carregar boleto"
                                 }
                             } catch (e: Exception) {
                                 errorMessage = "Erro ao carregar boleto: ${e.message}"

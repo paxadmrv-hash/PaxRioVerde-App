@@ -79,7 +79,8 @@ data class PixResponse(
 
 @Serializable
 data class BoletoResponse(
-    @SerialName("success") val success: Boolean,
+    @SerialName("success") val success: Boolean = true,
+    @SerialName("STATUS") val status: String? = null,
     @SerialName("idcontrato") val idContrato: Int? = null,
     @SerialName("mesano") val mesAno: String? = null,
     @SerialName("cpf") val cpf: String? = null,
