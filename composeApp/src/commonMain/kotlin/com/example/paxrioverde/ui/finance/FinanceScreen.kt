@@ -98,8 +98,14 @@ fun FinanceScreen(
         }
     }
 
-    val years = remember(anosData) { anosData.map { it.ano }.distinct().sortedDescending() }
-    var selectedYear by remember(years) { mutableStateOf(years.firstOrNull() ?: 2024) }
+    val today = remember { Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date }
+    val years = remember(anosData, today.year) { 
+        anosData.map { it.ano }
+            .filter { it <= today.year }
+            .distinct()
+            .sortedDescending() 
+    }
+    var selectedYear by remember(today.year) { mutableStateOf(today.year) }
     
     val oldestUnpaid = remember(anosData) {
         anosData.flatMap { it.mensalidades }
@@ -124,7 +130,6 @@ fun FinanceScreen(
 
     val historyInvoices = remember(selectedYear, anosData, oldestUnpaid) {
         val allForYear = anosData.find { it.ano == selectedYear }?.mensalidades ?: emptyList()
-        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
         
         // Identifica as próximas 3 mensalidades não pagas (incluindo a atual se não estiver paga)
         val futureUnpaidIds = allForYear
