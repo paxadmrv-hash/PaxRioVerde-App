@@ -92,6 +92,8 @@ val benefitsCategories = listOf(
     BenefitsCategory("Roupas",       Icons.Default.Checkroom),
     BenefitsCategory("Fitness",      Icons.Default.FitnessCenter),
     BenefitsCategory("Gás",       Icons.Default.Category),
+    BenefitsCategory("Chaveiro",     Icons.Default.Key),
+    BenefitsCategory("Manutenção",   Icons.Default.Build),
 )
 
 // ─────────────────────────────────────────────
@@ -125,10 +127,34 @@ val realPartners: List<Partner> = listOf(
         "R. Rosolino Campos, 637 - Morada do Sol, Rio Verde",
         "6436133375", "6499225-8879", Icons.Default.Restaurant, "Alimentação"),
 
-    // ACUPUNTURA
-    Partner("Dr. Washington Fabio Pacheco", "R\$90,00 por sessão",
-        "R. Rui Barbosa, 1261 - Centro (Clinica Solares), Rio Verde",
-        "556484037105", "", Icons.Default.HealthAndSafety, "Saúde"),
+    // SAÚDE
+    Partner("ALERGISTA", "Até 17% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("ACUPUNTURA", "Até 70% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("ANGIOLOGIA", "Até 28% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("CARDIOLOGISTA", "Até 33% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("CLÍNICO GERAL", "Até 25% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("DERMATOLOGISTA", "Até 12% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("ENDOCRINOLOGISTA", "Até 33% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("FONOAUDIOLOGIA", "Até 55% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("GASTROENTEROLOGIA", "Até 33% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("GERIATRIA", "Até 20% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("GINECOLOGISTA", "Até 33% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("NEFROLOGISTA", "Até 22% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("NEUROLOGISTA", "Até 16% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("NEUROPEDIATRIA", "Até 25% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("NEUROPSICOLOGIA", "Até 25% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("NUTRICIONISTA", "Até 55% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("OFTALMOLOGISTA", "Até 43% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("ONCOLOGISTA", "Até 22% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("ORTOPEDISTA", "Até 30% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("OTORRINOLARINGOLOGISTA", "Até 11% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("PEDIATRIA", "Até 55% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("PNEUMOLOGISTA", "Até 30% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("PSICOPEDAGOGIA", "Até 55% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("PSIQUIATRIA", "Até 16% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("REUMATOLOGISTA", "Até 28% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("TRICOLOGISTA", "Até 25% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
+    Partner("UROLOGISTA", "Até 60% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
 
     // LAZER
     Partner("Cine A", "Ingresso por R$10,00",
@@ -144,7 +170,7 @@ val realPartners: List<Partner> = listOf(
     Partner("Instituto Você", "20% nos treinamentos",
         "R. 55, 1326 - Setor Aeroporto, Rio Verde",
         "6239425456", "6299962-6522", Icons.Default.School, "Educação"),
-    Partner("Excellent Global", "40% nas mensalidades",
+    Partner("Excellent Global", "45% nas mensalidades e 50% nas Matriculas",
         "R. Almiro de Moraes, 554 - Setor Central, Rio Verde",
         "6430510015", "6499995-8013", Icons.Default.School, "Educação"),
     Partner("Unidombosco - Cursos EAD", "20% nas mensalidades EAD",
@@ -205,6 +231,12 @@ val realPartners: List<Partner> = listOf(
     Partner("Eucimar Vieira - Clinica Fisio Rio", "40% à vista",
         "R. Ana Mota, 813 - Santo Agostinho, Rio Verde",
         "6436134954", "", Icons.Default.SelfImprovement, "Fisioterapia"),
+    Partner("DR. SANDRINO ALVES FERNANDES CARRIJO", "20% de desconto (Atendimento Domiciliar)",
+        "Atendimento Domiciliar, Rio Verde",
+        "64981263525", "64981263525", Icons.Default.SelfImprovement, "Fisioterapia"),
+    Partner("DRA. MARIA FERNANDA PARREIRA ALVES", "25% de desconto (A Domicílio)",
+        "Atendimento a Domicílio, Rio Verde",
+        "64992842921", "64992842921", Icons.Default.SelfImprovement, "Fisioterapia"),
 
     // FONOAUDIOLOGIA
     Partner("Larissa Carvalho Ferreira - Clinica Benesse", "Consulte valores com o parceiro",
@@ -223,7 +255,7 @@ val realPartners: List<Partner> = listOf(
         "6436130110", "6499675-0110", Icons.Default.LocalFlorist, "Floricultura"),
 
     // CLINICAS
-    Partner("Clínica Ótovive", "22% consultas / 9% a 50% exames",
+    Partner("Clínica Otovive", "22% consultas / 9% a 50% exames",
         "R. Rosulino Ferreira Guimaraes, 840 - Centro, Rio Verde",
         "556484037105", "", Icons.Default.LocalHospital, "Clínicas"),
     Partner("Clínica Radiológica", "Descontos em exames de imagem",
@@ -238,6 +270,9 @@ val realPartners: List<Partner> = listOf(
     Partner("MedSaúde Clínica Odontológica", "Preços acessíveis para associados Pax",
         "Rio Verde - GO",
         "6436203110", "6499338-6180", Icons.Default.LocalHospital, "Clínicas"),
+    Partner("ALERGO VACINAS", "Até 10% de desconto",
+        "R. Nizo Jaime de Gusmão, 1200 - Centro, Rio Verde - GO, 75901-240",
+        "6436132828", "", Icons.Default.LocalHospital, "Clínicas"),
 
     // LABORATORIOS
     Partner("Laboratório Rio Verde", "10% a 70% de desconto",
@@ -250,22 +285,8 @@ val realPartners: List<Partner> = listOf(
         "Rio Verde - GO",
         "6499235-3303", "6499235-3303", Icons.Default.Science, "Laboratórios"),
 
-    // NUTRICIONISTAS
-    Partner("Ana Carolina Muniz Ferreira", "35% na consulta (inclui bio impedância)",
-        "R. Almiro de Moraes, 490 - Centro (Girassol Alimentos), Rio Verde",
-        "6499328-9792", "6499328-9792", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("Mariana Batista P. Gomes - Nutricionista", "66% na consulta",
-        "R. Nizo Jaime de Gusmao, 369 - Vila Amalia, Rio Verde",
-        "6436027300", "", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("Dra Aredanna Furquim - Endocrinologista", "R$300,00 COM desconto Pax (Original: R$450,00)",
-        "Clínica AJS, Rio Verde",
-        "6499951-0019", "6499951-0019", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("Dra Maria Cecilia - Dermatologista", "R$350,00 COM desconto Pax (Original: R$400,00)",
-        "Clínica AJS, Rio Verde",
-        "6499951-0019", "6499951-0019", Icons.Default.HealthAndSafety, "Saúde"),
-
     // OTICAS
-    Partner("Ótica Laiz - Centro", "30% à vista / crédito / crediário",
+    Partner("Ótica Laiz", "30% à vista / crédito / crediário",
         "R. Prof. Jeronimo Ferreira Sobrinho, 576 - Centro, Rio Verde",
         "6436235878", "", Icons.Default.RemoveRedEye, "Óticas"),
     Partner("Bella Ótica", "35% à vista / débito / crédito",
@@ -329,6 +350,17 @@ val realPartners: List<Partner> = listOf(
     Partner("Kalangotango Kids", "16% à vista / 10% no cartão (exceto promoções)",
         "Av. 77, 360 - Bairro Popular, Rio Verde",
         "6436125133", "", Icons.Default.Checkroom, "Roupas"),
+
+    // NOVOS PARCEIROS
+    Partner("CHAVEIRO LÔBO 24H", "Desconto de 15% em serviços e produtos",
+        "Rua Joaquim Vaz do Nascimento N°230 Centro, Rio Verde",
+        "64993187787", "64993187787", Icons.Default.Key, "Chaveiro"),
+    Partner("STUDIO MICHELLE CUNHA - Pilates", "Desconto de 10%",
+        "Rua Augusta Bastos N°1128 Setor Central, Rio Verde",
+        "6492297020", "6492297020", Icons.Default.SelfImprovement, "Fitness"),
+    Partner("JR REFRIGERAÇÃO", "Instalação, manutenção, carga de gás, limpeza e higienização de AR CONDICIONADO.\nDesconto de 20%",
+        "Rio Verde - GO",
+        "6492147714", "6492147714", Icons.Default.Build, "Manutenção"),
 
     // NOVAS PARCERIAS (DOCX)
     Partner("Disk Gás", "5% de desconto em gás de cozinha",
@@ -638,14 +670,14 @@ fun PartnerCard(partner: Partner) {
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(partner.name, fontWeight = FontWeight.Bold, fontSize = 14.sp,
-                        color = Slate800, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        color = Slate800, maxLines = if (expanded) Int.MAX_VALUE else 1, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.height(3.dp))
                     Surface(color = Amber50, shape = RoundedCornerShape(5.dp)) {
                         Text(
                             text = partner.discount,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                             fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = Amber500,
-                            maxLines = 2, overflow = TextOverflow.Ellipsis
+                            maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis
                         )
                     }
                     Spacer(Modifier.height(3.dp))
@@ -654,7 +686,7 @@ fun PartnerCard(partner: Partner) {
                             modifier = Modifier.size(12.dp))
                         Spacer(Modifier.width(2.dp))
                         Text(partner.address, fontSize = 11.sp, color = Slate500,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            maxLines = if (expanded) Int.MAX_VALUE else 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
 
