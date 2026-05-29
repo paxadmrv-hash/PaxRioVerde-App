@@ -419,6 +419,7 @@ fun FinanceHeader(
                         PaymentActionCard(
                             icon = Icons.AutoMirrored.Outlined.ReceiptLong,
                             title = "Boleto", 
+                            subtitle = "5% de desconto até à data do vencimento",
                             modifier = Modifier.weight(1f), 
                             onClick = onBoletoClick
                         )
@@ -533,12 +534,37 @@ fun HistoryInvoiceItem(
 }
 
 @Composable
-fun PaymentActionCard(icon: ImageVector, title: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = SurfaceWhite), elevation = CardDefaults.cardElevation(defaultElevation = 4.dp), modifier = modifier.height(100.dp).clickable { onClick() }) {
-        Column(modifier = Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+fun PaymentActionCard(
+    icon: ImageVector, 
+    title: String, 
+    modifier: Modifier = Modifier, 
+    subtitle: String? = null,
+    onClick: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(20.dp), 
+        colors = CardDefaults.cardColors(containerColor = SurfaceWhite), 
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp), 
+        modifier = modifier.height(110.dp).clickable { onClick() }
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(12.dp), 
+            verticalArrangement = Arrangement.Center, 
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Icon(imageVector = icon, contentDescription = null, tint = BrandGreen, modifier = Modifier.size(28.dp))
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary, textAlign = TextAlign.Center)
+            if (subtitle != null) {
+                Text(
+                    text = subtitle, 
+                    fontSize = 10.sp, 
+                    color = BrandGreen, 
+                    textAlign = TextAlign.Center,
+                    lineHeight = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }

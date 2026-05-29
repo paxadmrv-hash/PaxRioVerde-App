@@ -126,7 +126,7 @@ fun FirstAccessScreen(onBack: () -> Unit) {
                     LoginTextField(
                         value = cpf,
                         onValueChange = { cpf = it.filter { c -> c.isDigit() }.take(11) },
-                        label = "Seu CPF (apenas números)",
+                        label = "Seu CPF (SOMENTE TITULAR DO PLANO)",
                         icon = Icons.Default.Badge,
                         keyboardType = KeyboardType.Number,
                         visualTransformation = CpfVisualTransformation()

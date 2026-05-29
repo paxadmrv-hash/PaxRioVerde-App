@@ -43,9 +43,7 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.okhttp)
-            implementation(libs.peekaboo.image.picker)
-            implementation(libs.peekaboo.ui)
-            
+
             // Forçando versões compatíveis com 16KB para CameraX
             val cameraVersion = "1.4.0"
             implementation("androidx.camera:camera-core:$cameraVersion")
@@ -79,8 +77,7 @@ kotlin {
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
-            implementation(libs.peekaboo.image.picker)
-            implementation(libs.peekaboo.ui)
+
         }
     }
 }
@@ -93,8 +90,8 @@ android {
         applicationId = "br.com.paxrioverde.app"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = 35 // Definindo explicitamente para garantir conformidade
-        versionCode = 16
-        versionName = "1.1.12"
+        versionCode = 19
+        versionName = "1.1.15"
         
         ndk {
             debugSymbolLevel = "FULL"

@@ -2,23 +2,25 @@ package com.example.paxrioverde.ui.pet
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
-import com.preat.peekaboo.image.picker.SelectionMode
+import androidx.compose.ui.platform.LocalContext
 import java.io.ByteArrayOutputStream
 
 @Composable
 actual fun rememberImagePickerLauncher(onImagePicked: (ByteArray?) -> Unit): ImagePickerLauncher {
-    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     
-    // Na versão 0.5.2, a função da biblioteca se chama rememberImagePickerLauncher.
-    // Usamos o nome completo do pacote para evitar conflito com a nossa própria função 'actual'.
-    val launcher = com.preat.peekaboo.image.picker.rememberImagePickerLauncher(
-        selectionMode = SelectionMode.Single,
-        scope = scope,
-        onResult = { byteArrays: List<ByteArray> ->
-            val compressed = byteArrays.firstOrNull()?.let { bytes ->
-                try {
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    val bytes = inputStream.readBytes()
+                    
                     // 1. Decodifica apenas as dimensões para calcular o sample size
                     val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
@@ -52,18 +54,20 @@ actual fun rememberImagePickerLauncher(onImagePicked: (ByteArray?) -> Unit): Ima
                     // 5. Comprime para JPEG 60% para reduzir o tamanho do Base64
                     val out = ByteArrayOutputStream()
                     bitmap?.compress(Bitmap.CompressFormat.JPEG, 60, out)
-                    out.toByteArray()
-                } catch (e: Exception) {
-                    bytes // Se falhar em qualquer etapa, tenta enviar o original
+                    onImagePicked(out.toByteArray())
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                onImagePicked(null)
             }
-            onImagePicked(compressed)
+        } else {
+            onImagePicked(null)
         }
-    )
+    }
 
     return object : ImagePickerLauncher {
         override fun launch() {
-            launcher.launch()
+            launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         }
     }
 }

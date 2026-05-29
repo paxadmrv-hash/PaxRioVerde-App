@@ -48,6 +48,50 @@ object BillingNotificationManager {
                     epochSeconds = triggerTimeToday.epochSeconds
                 )
             }
+
+            // Overdue Notifications (After due date)
+            
+            // Notification 3: 5 days overdue
+            val fiveDaysAfter = dueDate.plus(5, DateTimeUnit.DAY)
+            if (fiveDaysAfter >= today) {
+                val triggerTime = LocalDateTime(fiveDaysAfter.year, fiveDaysAfter.month, fiveDaysAfter.dayOfMonth, 10, 0)
+                    .toInstant(TimeZone.currentSystemDefault())
+                
+                scheduler.scheduleNotification(
+                    id = 103,
+                    title = "Pax Rio Verde",
+                    message = "Sua mensalidade está em atraso há 5 dias. Regularize agora e mantenha seus benefícios ativos.",
+                    epochSeconds = triggerTime.epochSeconds
+                )
+            }
+
+            // Notification 4: 15 days overdue
+            val fifteenDaysAfter = dueDate.plus(15, DateTimeUnit.DAY)
+            if (fifteenDaysAfter >= today) {
+                val triggerTime = LocalDateTime(fifteenDaysAfter.year, fifteenDaysAfter.month, fifteenDaysAfter.dayOfMonth, 10, 0)
+                    .toInstant(TimeZone.currentSystemDefault())
+                
+                scheduler.scheduleNotification(
+                    id = 104,
+                    title = "Pax Rio Verde",
+                    message = "Atenção: sua mensalidade está em atraso há 15 dias. Evite a suspensão dos serviços, faça o pagamento hoje mesmo.",
+                    epochSeconds = triggerTime.epochSeconds
+                )
+            }
+
+            // Notification 5: 30 days overdue
+            val thirtyDaysAfter = dueDate.plus(30, DateTimeUnit.DAY)
+            if (thirtyDaysAfter >= today) {
+                val triggerTime = LocalDateTime(thirtyDaysAfter.year, thirtyDaysAfter.month, thirtyDaysAfter.dayOfMonth, 10, 0)
+                    .toInstant(TimeZone.currentSystemDefault())
+                
+                scheduler.scheduleNotification(
+                    id = 105,
+                    title = "Pax Rio Verde",
+                    message = "Importante: sua mensalidade da Pax Rio Verde está em atraso há 30 dias. Para manter seus benefícios ativos, pedimos que faça a regularização o quanto antes.",
+                    epochSeconds = triggerTime.epochSeconds
+                )
+            }
         } catch (e: Exception) {
             println("Error scheduling notifications: ${e.message}")
         }
