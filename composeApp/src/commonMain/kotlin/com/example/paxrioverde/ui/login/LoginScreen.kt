@@ -321,7 +321,11 @@ fun LoginTextField(
         } else {
             visualTransformation
         },
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        keyboardOptions = KeyboardOptions.Default.copy(
+            keyboardType = if (isPassword) KeyboardType.Password else keyboardType,
+            capitalization = KeyboardCapitalization.None,
+            autoCorrectEnabled = false
+        ),
         singleLine = true,
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth(),

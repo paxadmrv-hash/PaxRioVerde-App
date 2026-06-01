@@ -159,7 +159,7 @@ fun FirstAccessScreen(onBack: () -> Unit) {
                         onValueChange = { password = it },
                         label = "Crie uma Senha",
                         icon = Icons.Default.Lock,
-                        keyboardType = KeyboardType.Text,
+                        keyboardType = KeyboardType.Password,
                         isPassword = true,
                         isPasswordVisible = passwordVisible,
                         onVisibilityChange = { passwordVisible = !passwordVisible }
@@ -172,7 +172,7 @@ fun FirstAccessScreen(onBack: () -> Unit) {
                         onValueChange = { confirmPassword = it },
                         label = "Confirme a Senha",
                         icon = Icons.Default.LockReset,
-                        keyboardType = KeyboardType.Text,
+                        keyboardType = KeyboardType.Password,
                         isPassword = true,
                         isPasswordVisible = confirmPasswordVisible,
                         onVisibilityChange = { confirmPasswordVisible = !confirmPasswordVisible }
