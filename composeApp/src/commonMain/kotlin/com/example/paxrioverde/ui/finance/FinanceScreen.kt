@@ -206,7 +206,7 @@ fun FinanceScreen(
                                         type = NotificationType.PAYMENT
                                     )
                                 } else {
-                                    errorMessage = "Erro ao gerar PIX: ${pixResponse.message ?: "Resposta vazia do servidor"}"
+                                    errorMessage = "Erro ao gerar PIX: ${pixResponse.message ?: "Verifique a sua conexão"}"
                                 }
                             } catch (e: Exception) {
                                 errorMessage = "Erro ao gerar PIX: ${e.message}"

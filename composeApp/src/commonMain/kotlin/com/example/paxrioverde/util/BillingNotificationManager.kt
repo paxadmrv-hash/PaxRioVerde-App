@@ -60,7 +60,7 @@ object BillingNotificationManager {
                 scheduler.scheduleNotification(
                     id = 103,
                     title = "Pax Rio Verde",
-                    message = "Sua mensalidade está em atraso há 5 dias. Regularize agora e mantenha seus benefícios ativos.",
+                    message = "Você tem uma mensalidade pendente. Consulte seu plano pelo aplicativo Pax Rio Verde.",
                     epochSeconds = triggerTime.epochSeconds
                 )
             }
@@ -74,7 +74,7 @@ object BillingNotificationManager {
                 scheduler.scheduleNotification(
                     id = 104,
                     title = "Pax Rio Verde",
-                    message = "Atenção: sua mensalidade está em atraso há 15 dias. Evite a suspensão dos serviços, faça o pagamento hoje mesmo.",
+                    message = " Identificamos mensalidade em atraso. Regularize facilmente pelo aplicativo Pax Rio Verde.",
                     epochSeconds = triggerTime.epochSeconds
                 )
             }
@@ -88,9 +88,33 @@ object BillingNotificationManager {
                 scheduler.scheduleNotification(
                     id = 105,
                     title = "Pax Rio Verde",
-                    message = "Importante: sua mensalidade da Pax Rio Verde está em atraso há 30 dias. Para manter seus benefícios ativos, pedimos que faça a regularização o quanto antes.",
+                    message = "Queremos ajudar você a manter seu plano ativo. Consulte e regularize pelo aplicativo Pax Rio Verde.",
                     epochSeconds = triggerTime.epochSeconds
                 )
+            }
+
+            // Informative Notifications (Every 10 days: 10, 20, 30)
+            listOf(10, 20, 30).forEachIndexed { index, dayOfMonth ->
+                try {
+                    var scheduledDate = LocalDate(today.year, today.month, dayOfMonth)
+                    if (today.dayOfMonth > dayOfMonth) {
+                        scheduledDate = scheduledDate.plus(1, DateTimeUnit.MONTH).let {
+                            LocalDate(it.year, it.month, dayOfMonth)
+                        }
+                    }
+
+                    val triggerTime = LocalDateTime(scheduledDate.year, scheduledDate.month, scheduledDate.dayOfMonth, 11, 0)
+                        .toInstant(TimeZone.currentSystemDefault())
+
+                    scheduler.scheduleNotification(
+                        id = 200 + index,
+                        title = "Pax Rio Verde",
+                        message = "Você sabia? Pelo aplicativo Pax Rio Verde você pode consultar mensalidades, cartão digital e informações do seu plano a qualquer momento.",
+                        epochSeconds = triggerTime.epochSeconds
+                    )
+                } catch (e: Exception) {
+                    // Ignore if the day (e.g., 30th) doesn't exist in the current/next month
+                }
             }
         } catch (e: Exception) {
             println("Error scheduling notifications: ${e.message}")
