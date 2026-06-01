@@ -187,11 +187,19 @@ fun FinanceScreen(
                         scope.launch {
                             isGeneratingPayment = true
                             try {
+                                // Lógica para mensalidades vencidas: usar a data de hoje para o PIX Dinâmico
+                                val originalDate = parseDate(mens.dtvencimento)
+                                val finalDate = if (originalDate != null && originalDate < today) {
+                                    "${today.dayOfMonth.toString().padStart(2, '0')}/${today.monthNumber.toString().padStart(2, '0')}/${today.year}"
+                                } else {
+                                    mens.dtvencimento
+                                }
+
                                 val pixResponse = ApiService.gerarPix(
                                     idcaixa = idcaixa,
                                     idcontrato = mens.idcontrato,
                                     idconvenio = mens.idconvenio,
-                                    dtvencimento = mens.dtvencimento,
+                                    dtvencimento = finalDate,
                                     idmensalidade = mens.idmensalidade,
                                     valorCartao = null,
                                     valorTotal = totalValor
@@ -419,7 +427,7 @@ fun FinanceHeader(
                         PaymentActionCard(
                             icon = Icons.AutoMirrored.Outlined.ReceiptLong,
                             title = "Boleto", 
-                            subtitle = "5% de desconto até à data do vencimento",
+                            subtitle = "5% de desconto até a data do vencimento",
                             modifier = Modifier.weight(1f), 
                             onClick = onBoletoClick
                         )
