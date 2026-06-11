@@ -427,10 +427,39 @@ fun FinanceHeader(
                         PaymentActionCard(
                             icon = Icons.AutoMirrored.Outlined.ReceiptLong,
                             title = "Boleto", 
-                            subtitle = "5% de desconto até a data do vencimento",
                             modifier = Modifier.weight(1f), 
                             onClick = onBoletoClick
                         )
+                    }
+                }
+
+                if (showBoleto) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Surface(
+                        color = Color.White.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Pague com Pix ou Boleto e ganhe 5% de desconto até a data de vencimento.",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }
