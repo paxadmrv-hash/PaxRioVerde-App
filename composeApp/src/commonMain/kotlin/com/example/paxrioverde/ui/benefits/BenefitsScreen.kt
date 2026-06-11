@@ -157,7 +157,7 @@ val realPartners: List<Partner> = listOf(
     Partner("UROLOGISTA", "Até 60% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
 
     // LAZER
-    Partner("Cine A", "Ingresso por R$10,00",
+    Partner("Cine A", "Ingresso por R$12,00",
         "Av. Presidente Vargas, 1470 - Jardim Goias (Shopping Rio Verde), Rio Verde",
         "6436124216", "", Icons.Default.Movie, "Lazer"),
 
