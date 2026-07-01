@@ -115,19 +115,6 @@ fun FinanceScreen(
             .firstOrNull()?.second
     }
 
-    // Lógica para remover o aviso de taxa de cartão se a mensalidade alvo for paga
-    LaunchedEffect(anosData) {
-        if (WalletCache.pendingCardFee != null) {
-            // Só limpa se encontrarmos a mensalidade alvo e ela estiver MARCADA COMO PAGA
-            val targetInvoicePaid = anosData.flatMap { it.mensalidades }
-                .any { it.dtvencimento == vencProxMens && it.pago }
-            
-            if (targetInvoicePaid && vencProxMens != "--/--/----") {
-                WalletCache.updatePendingCardFee(null)
-            }
-        }
-    }
-
     val historyInvoices = remember(selectedYear, anosData, oldestUnpaid) {
         val allForYear = anosData.find { it.ano == selectedYear }?.mensalidades ?: emptyList()
         
@@ -291,48 +278,6 @@ fun FinanceScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    item {
-                        if (WalletCache.pendingCardFee != null) {
-                            Card(
-                                shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = BrandGreen.copy(alpha = 0.1f)
-                                ),
-                                border = BorderStroke(1.dp, BrandGreen.copy(alpha = 0.2f)),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 8.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.CreditCard,
-                                        contentDescription = null,
-                                        tint = BrandGreen,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(
-                                            text = "Taxa de Cartão Pendente",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp,
-                                            color = BrandGreen
-                                        )
-                                        Text(
-                                            text = "Uma cobrança de R$ ${WalletCache.pendingCardFee} foi adicionada à sua próxima mensalidade devido à emissão de um novo cartão.",
-                                            fontSize = 12.sp,
-                                            color = TextSecondary,
-                                            lineHeight = 16.sp
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
                     item {
                         HistoryHeader(
                             years = years,

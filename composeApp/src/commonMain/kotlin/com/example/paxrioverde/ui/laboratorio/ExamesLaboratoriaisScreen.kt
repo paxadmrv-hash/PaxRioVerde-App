@@ -69,7 +69,7 @@ fun ExamesLaboratoriaisScreen(onBack: () -> Unit) {
                             Icon(Icons.Default.Verified, null, tint = BrandGreenMain)
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                "Associados PAX: Até 70% de desconto!",
+                                "Associados PAX: Até 80% de desconto!",
                                 fontWeight = FontWeight.Bold,
                                 color = BrandGreenMain,
                                 fontSize = 14.sp

@@ -13,9 +13,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CreditCard
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.paxrioverde.api.*
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
@@ -62,11 +61,14 @@ fun VirtualCardScreen(
     dtvencimento: String = "",
     valorCartao: String? = null,
     onCardGenerated: () -> Unit = {},
-    onNavigateToFinance: () -> Unit = {}
+    onNavigateToFinance: () -> Unit = {},
+    viewModel: VirtualCardViewModel = viewModel { VirtualCardViewModel() }
 ) {
     val cartoesList = WalletCache.cartoesList
     val isPreloading = WalletCache.isPreloading
     
+    val uiState by viewModel.uiState.collectAsState()
+
     var showGerarDialog by remember { mutableStateOf(false) }
     var expandedCard by remember { mutableStateOf<CartaoItem?>(null) }
 
@@ -241,7 +243,10 @@ fun VirtualCardScreen(
 
     if (showGerarDialog) {
         GerarCartaoDialog(
-            onDismiss = { showGerarDialog = false },
+            onDismiss = { 
+                showGerarDialog = false
+                viewModel.resetState()
+            },
             idcliente = idcliente,
             idcontrato = idcontrato,
             idconvenio = idconvenio,
@@ -251,7 +256,8 @@ fun VirtualCardScreen(
             dtvencimento = dtvencimento,
             valorCartao = valorCartao,
             onSuccess = onCardGenerated,
-            onNavigateToFinance = onNavigateToFinance
+            onNavigateToFinance = onNavigateToFinance,
+            viewModel = viewModel
         )
     }
 
@@ -435,330 +441,210 @@ fun GerarCartaoDialog(
     dtvencimento: String,
     valorCartao: String? = null,
     onSuccess: () -> Unit = {},
-    onNavigateToFinance: () -> Unit = {}
+    onNavigateToFinance: () -> Unit = {},
+    viewModel: VirtualCardViewModel
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+    
     var isTitular by remember { mutableStateOf(true) }
     val dependentesList = WalletCache.dependentesList
     var selectedDependente by remember { mutableStateOf<DependenteItem?>(null) }
     var expanded by remember { mutableStateOf(false) }
     
-    // Novas variáveis para seleção de estilo visual
     val estilos = listOf("Adulto", "Teen", "Kids")
     var selectedEstilo by remember { mutableStateOf(estilos[0]) }
     var expandedEstilo by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
+    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
 
     val valorFormatado = remember(valorCartao) {
         val valor = if (valorCartao.isNullOrEmpty() || valorCartao == "0,00" || valorCartao == "0.00") "5,00" else valorCartao
         if (valor.contains("R$")) valor else "R$ $valor"
     }
-    
-    var showConfirmacao by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
-    var showResultDialog by remember { mutableStateOf(false) }
-    var resultMessage by remember { mutableStateOf("") }
-    var isSuccess by remember { mutableStateOf(false) }
 
-    if (showResultDialog) {
-        AlertDialog(
-            onDismissRequest = { 
-                showResultDialog = false
-                if (isSuccess) onDismiss()
-            },
-            title = { Text(if (isSuccess) "Sucesso" else "Atenção", fontWeight = FontWeight.Bold) },
-            text = { Text(resultMessage) },
-            confirmButton = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    if (isSuccess) {
-                        TextButton(onClick = {
-                            showResultDialog = false
-                            onDismiss()
-                            onNavigateToFinance()
-                        }) {
-                            Text("VER MENSALIDADE", color = BrandLightGreen, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    Button(onClick = {
-                        showResultDialog = false
-                        if (isSuccess) onDismiss()
-                    }, colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen)) {
-                        Text("OK")
-                    }
-                }
-            }
-        )
-    }
-
-    if (showConfirmacao) {
-        AlertDialog(
-            onDismissRequest = { if (!isLoading) showConfirmacao = false },
-            title = { 
-                Text(
-                    "Confirmação", 
-                    fontWeight = FontWeight.Bold,
-                    color = BrandLightGreen
-                ) 
-            },
-            text = { 
-                Text("Atenção: a geração deste cartão gerará um custo adicional de $valorFormatado, que será incluído na sua próxima mensalidade. Deseja gerar o cartão?") 
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        scope.launch {
-                            isLoading = true
-                            try {
-                                val tipoBackend = if (isTitular) "titular" else "dependente"
-                                val nomeDep = if (isTitular) "" else selectedDependente?.nomeDependente ?: ""
-                                
-                                // O campo 'tipo' enviado ao backend permanece 'titular' ou 'dependente'
-                                // para não quebrar a lógica do servidor.
-                                
-                                // Limpa o valor para enviar apenas números e ponto
-                                val valorLimpo = if (valorCartao.isNullOrEmpty() || valorCartao == "0,00" || valorCartao == "0.00") "5.00" else {
-                                    valorCartao.replace("R$", "")
-                                        .replace(".", "")
-                                        .replace(",", ".")
-                                        .trim()
-                                }
-
-                                // Envio dos dados para geração do cartão e acionamento do financeiro
-                                val response = ApiService.gerarCartao(
-                                    idcliente = idcliente,
-                                    tipo = tipoBackend,
-                                    nomeDependente = nomeDep,
-                                    idcontrato = idcontrato,
-                                    idconvenio = idconvenio,
-                                    valor = valorLimpo,
-                                    idmensalidade = idmensalidade,
-                                    idcaixa = idcaixa,
-                                    idfilial = idfilial,
-                                    dtvencimento = dtvencimento
-                                )
-                                
-                                if (response.success) {
-                                    // Captura os IDs atuais antes de atualizar
-                                    val oldIds = WalletCache.cartoesList.map { it.idControle }.toSet()
-                                    
-                                    isSuccess = true
-                                    resultMessage = "Cartão gerado com sucesso! A cobrança de $valorFormatado foi lançada na sua mensalidade."
-                                    
-                                    // Limpa o cache para garantir que venha do servidor
-                                    WalletCache.clear() 
-
-                                    // Registra o acréscimo pendente no cache e storage para exibição persistente
-                                    // Usamos vírgula para manter o padrão visual do app
-                                    WalletCache.updatePendingCardFee(valorLimpo.replace(".", ","))
-
-                                    // Recarrega cartões e notifica o App para atualizar dados do usuário
-                                    WalletCache.preLoad(idcliente, forceRefresh = true)
-                                    
-                                    // Tenta encontrar o novo cartão e aplica o estilo escolhido
-                                    val newCards = WalletCache.cartoesList.filter { it.idControle !in oldIds }
-                                    if (newCards.isNotEmpty()) {
-                                        newCards.forEach { cardStyleOverrides[it.idControle] = selectedEstilo }
-                                    } else {
-                                        // Fallback: se não achar pelo ID novo, pega o último da lista
-                                        WalletCache.cartoesList.lastOrNull()?.let { 
-                                            cardStyleOverrides[it.idControle] = selectedEstilo 
-                                        }
-                                    }
-
-                                    onSuccess() 
-                                } else {
-                                    isSuccess = false
-                                    resultMessage = response.message ?: "Erro ao processar solicitação no sistema."
-                                }
-
-                                showConfirmacao = false
-                                showResultDialog = true
-                            } catch (e: Exception) {
-                                isSuccess = false
-                                resultMessage = "Erro de conexão: Verifique sua internet."
-                                showConfirmacao = false
-                                showResultDialog = true
-                            } finally {
-                                isLoading = false
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen),
-                    enabled = !isLoading
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
-                    } else {
-                        Text("Sim")
-                    }
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showConfirmacao = false },
-                    enabled = !isLoading
-                ) {
-                    Text("Não", color = Color.Gray)
-                }
-            },
-            containerColor = Color.White,
-            titleContentColor = BrandLightGreen,
-            textContentColor = Color.Black
-        )
-    }
-
-    Dialog(onDismissRequest = { if (!isLoading) onDismiss() }) {
+    Dialog(onDismissRequest = { 
+        if (uiState !is VirtualCardState.Loading) {
+            onDismiss() 
+        }
+    }) {
         Card(
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             modifier = Modifier.fillMaxWidth().padding(16.dp)
         ) {
-            Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Gerar Novo Cartão", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = BrandLightGreen, modifier = Modifier.padding(bottom = 16.dp))
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                when (val state = uiState) {
+                    is VirtualCardState.Idle -> {
+                        Text("Gerar Novo Cartão", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = BrandLightGreen, modifier = Modifier.padding(bottom = 16.dp))
 
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { isTitular = true }) {
-                    RadioButton(selected = isTitular, onClick = { isTitular = true }, colors = RadioButtonDefaults.colors(selectedColor = BrandLightGreen))
-                    Text("Titular", color = Color.Black)
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { isTitular = false }) {
-                    RadioButton(selected = !isTitular, onClick = { isTitular = false }, colors = RadioButtonDefaults.colors(selectedColor = BrandLightGreen))
-                    Text("Dependente", color = Color.Black)
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Seletor de Estilo Visual (Apenas para Dependentes)
-                if (!isTitular) {
-                    Text(
-                        "Estilo do Cartão",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Gray,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-                    )
-
-                    ExposedDropdownMenuBox(
-                        expanded = expandedEstilo,
-                        onExpandedChange = { expandedEstilo = !expandedEstilo }
-                    ) {
-                        OutlinedTextField(
-                            value = selectedEstilo,
-                            onValueChange = {},
-                            readOnly = true,
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedEstilo) },
-                            modifier = Modifier.menuAnchor().fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = BrandLightGreen,
-                                unfocusedBorderColor = Color.LightGray,
-                                focusedTextColor = Color.Black,
-                                unfocusedTextColor = Color.Black
-                            )
-                        )
-
-                        ExposedDropdownMenu(
-                            expanded = expandedEstilo,
-                            onDismissRequest = { expandedEstilo = false },
-                            modifier = Modifier.background(Color.White)
-                        ) {
-                            estilos.forEach { estilo ->
-                                val range = when (estilo) {
-                                    "Kids" -> " (Até 9 anos)"
-                                    "Teen" -> " (10 a 17 anos)"
-                                    else -> " (+18 anos)"
-                                }
-                                DropdownMenuItem(
-                                    text = { Text(estilo + range, color = Color.Black) },
-                                    onClick = {
-                                        selectedEstilo = estilo
-                                        expandedEstilo = false
-                                    },
-                                    colors = MenuDefaults.itemColors(
-                                        textColor = Color.Black,
-                                        trailingIconColor = BrandLightGreen
-                                    )
-                                )
-                            }
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { isTitular = true }) {
+                            RadioButton(selected = isTitular, onClick = { isTitular = true }, colors = RadioButtonDefaults.colors(selectedColor = BrandLightGreen))
+                            Text("Titular", color = Color.Black)
                         }
-                    }
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { isTitular = false }) {
+                            RadioButton(selected = !isTitular, onClick = { isTitular = false }, colors = RadioButtonDefaults.colors(selectedColor = BrandLightGreen))
+                            Text("Dependente", color = Color.Black)
+                        }
 
-                    Spacer(modifier = Modifier.height(16.dp))
-                } else {
-                    // Se for titular, garante que o estilo seja Adulto
-                    LaunchedEffect(Unit) {
-                        selectedEstilo = "Adulto"
-                    }
-                }
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                if (!isTitular) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    ExposedDropdownMenuBox(
-                        expanded = expanded,
-                        onExpandedChange = { expanded = !expanded }
-                    ) {
-                        OutlinedTextField(
-                            value = selectedDependente?.nomeDependente ?: "Selecione o dependente",
-                            onValueChange = {},
-                            readOnly = true,
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                            modifier = Modifier.menuAnchor().fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = BrandLightGreen,
-                                unfocusedBorderColor = Color.LightGray,
-                                focusedTextColor = Color.Black,
-                                unfocusedTextColor = Color.Black
-                            )
-                        )
-
-                        ExposedDropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false },
-                            modifier = Modifier.background(Color.White)
-                        ) {
-                            if (dependentesList.isEmpty()) {
-                                DropdownMenuItem(
-                                    text = { Text("Nenhum dependente encontrado", color = Color.Black) },
-                                    onClick = { },
-                                    colors = MenuDefaults.itemColors(textColor = Color.Black)
+                        if (!isTitular) {
+                            Text("Estilo do Cartão", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
+                            ExposedDropdownMenuBox(expanded = expandedEstilo, onExpandedChange = { expandedEstilo = !expandedEstilo }) {
+                                OutlinedTextField(
+                                    value = selectedEstilo,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedEstilo) },
+                                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = BrandLightGreen, unfocusedBorderColor = Color.LightGray, focusedTextColor = Color.Black, unfocusedTextColor = Color.Black)
                                 )
-                            } else {
-                                dependentesList.forEach { dep ->
-                                    DropdownMenuItem(
-                                        text = { Text("${dep.nomeDependente} (${dep.parentesco})", color = Color.Black) },
-                                        onClick = {
-                                            selectedDependente = dep
-                                            expanded = false
-                                        },
-                                        colors = MenuDefaults.itemColors(
-                                            textColor = Color.Black,
-                                            trailingIconColor = BrandLightGreen
+                                ExposedDropdownMenu(expanded = expandedEstilo, onDismissRequest = { expandedEstilo = false }, modifier = Modifier.background(Color.White)) {
+                                    estilos.forEach { estilo ->
+                                        DropdownMenuItem(
+                                            text = { Text(estilo, color = Color.Black) },
+                                            onClick = { selectedEstilo = estilo; expandedEstilo = false },
+                                            colors = MenuDefaults.itemColors(textColor = Color.Black)
                                         )
-                                    )
+                                    }
                                 }
                             }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
+                                OutlinedTextField(
+                                    value = selectedDependente?.nomeDependente ?: "Selecione o dependente",
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = BrandLightGreen, unfocusedBorderColor = Color.LightGray, focusedTextColor = Color.Black, unfocusedTextColor = Color.Black)
+                                )
+                                ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.background(Color.White)) {
+                                    dependentesList.forEach { dep ->
+                                        DropdownMenuItem(
+                                            text = { Text("${dep.nomeDependente}", color = Color.Black) },
+                                            onClick = { selectedDependente = dep; expanded = false },
+                                            colors = MenuDefaults.itemColors(textColor = Color.Black)
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            LaunchedEffect(Unit) { selectedEstilo = "Adulto" }
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Text("Custo Adicional: $valorFormatado", color = Color.Gray, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = { 
+                                if (isTitular || selectedDependente != null) {
+                                    viewModel.gerarCartaoPix(
+                                        idcaixa = idcaixa,
+                                        idcliente = idcliente,
+                                        tipo = if (isTitular) "titular" else "dependente",
+                                        nomeDependente = if (isTitular) "" else selectedDependente?.nomeDependente ?: "",
+                                        estiloSelecionado = selectedEstilo
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("GERAR COM PIX", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                        TextButton(onClick = onDismiss) { Text("Fechar", color = Color.Gray) }
+                    }
+
+                    is VirtualCardState.Loading -> {
+                        CircularProgressIndicator(color = BrandLightGreen)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Processando...", color = Color.Black)
+                    }
+
+                    is VirtualCardState.PixGenerated -> {
+                        Text("Pagamento PIX", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = BrandLightGreen)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Copie o código abaixo e pague no seu banco:", textAlign = TextAlign.Center, color = Color.Black)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedTextField(
+                            value = state.pixCode,
+                            onValueChange = {},
+                            readOnly = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            maxLines = 3,
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.Black, unfocusedTextColor = Color.Black)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = { 
+                                clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(state.pixCode))
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen)
+                        ) {
+                            Text("COPIAR CÓDIGO")
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Aguardando pagamento...", color = Color.Gray, fontSize = 12.sp)
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp), color = BrandLightGreen)
+                        TextButton(onClick = onDismiss) { Text("Cancelar", color = Color.Red) }
+                    }
+
+                    is VirtualCardState.Success -> {
+                        Icon(Icons.Default.CheckCircle, null, tint = BrandLightGreen, modifier = Modifier.size(64.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Sucesso!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = BrandLightGreen)
+                        Text("Cartão gerado com sucesso.", color = Color.Black)
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        state.newCard?.let { card ->
+                            // Update style override if needed
+                            LaunchedEffect(card.idControle) {
+                                cardStyleOverrides[card.idControle] = selectedEstilo
+                            }
+                            Card(
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth().aspectRatio(1.586f)
+                            ) {
+                                CardContent(item = card)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(
+                            onClick = { 
+                                onDismiss()
+                                onSuccess()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen)
+                        ) {
+                            Text("OK")
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(24.dp))
-                Button(
-                    onClick = { 
-                        if (!isTitular && selectedDependente == null) {
-
-                        } else {
-                            showConfirmacao = true
+                    is VirtualCardState.Error -> {
+                        Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(64.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Erro", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.Red)
+                        Text(state.message, color = Color.Black, textAlign = TextAlign.Center)
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(
+                            onClick = { viewModel.resetState() },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen)
+                        ) {
+                            Text("TENTAR NOVAMENTE")
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("GERAR CARTÃO", color = Color.White, fontWeight = FontWeight.Bold)
+                        TextButton(onClick = onDismiss) { Text("Fechar", color = Color.Gray) }
+                    }
                 }
-                TextButton(onClick = onDismiss) { Text("Fechar", color = Color.Gray) }
             }
         }
     }

@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.paxrioverde.util.shareText
 import com.example.paxrioverde.util.urlEncode
 import org.jetbrains.compose.resources.painterResource
 import paxrioverde.composeapp.generated.resources.Res
@@ -239,7 +240,7 @@ val realPartners: List<Partner> = listOf(
         "64992842921", "64992842921", Icons.Default.SelfImprovement, "Fisioterapia"),
 
     // FONOAUDIOLOGIA
-    Partner("Larissa Carvalho Ferreira - Clinica Benesse", "Consulte valores com o parceiro",
+    Partner("Larissa Carvalho Ferreira - Fonoaudiologia", "Consulte valores com o parceiro",
         "R. Nivaldo Ribeiro, 72 (2 andar) - Setor Central, Rio Verde",
         "6436021010", "6499858289", Icons.Default.RecordVoiceOver, "Clínicas"),
     Partner("Clínica Bambinos - Fonoaudiologia", "Consulte valores com o parceiro",
@@ -419,14 +420,19 @@ fun BenefitsScreen(onBack: () -> Unit) {
     val uriHandler = LocalUriHandler.current
     var selectedCategory by remember { mutableStateOf("Todos") }
     var selectedCity     by remember { mutableStateOf("Todas") }
+    var searchQuery      by remember { mutableStateOf("") }
 
     val cities = listOf("Todas", "Rio Verde", "Montividiu", "Aparecida do Rio Doce", "Santo Antônio da Barra")
 
-    val filteredPartners: List<Partner> = remember(selectedCategory, selectedCity) {
+    val filteredPartners: List<Partner> = remember(selectedCategory, selectedCity, searchQuery) {
         realPartners.filter { p ->
             val catOk  = selectedCategory == "Todos" || p.category == selectedCategory
             val cityOk = selectedCity == "Todas"    || p.city == selectedCity
-            catOk && cityOk
+            val searchOk = searchQuery.isEmpty() ||
+                    p.name.contains(searchQuery, ignoreCase = true) ||
+                    p.category.contains(searchQuery, ignoreCase = true) ||
+                    p.discount.contains(searchQuery, ignoreCase = true)
+            catOk && cityOk && searchOk
         }
     }
 
@@ -457,6 +463,13 @@ fun BenefitsScreen(onBack: () -> Unit) {
             }
 
             item {
+                SearchBarRow(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it }
+                )
+            }
+
+            item {
                 BenefitsSectionHeader(
                     title = if (selectedCategory == "Todos") "Todos os parceiros" else selectedCategory,
                     subtitle = if (selectedCity == "Todas") "Todas as cidades" else selectedCity,
@@ -475,6 +488,42 @@ fun BenefitsScreen(onBack: () -> Unit) {
             item { BenefitsLegalDisclaimer() }
         }
     }
+}
+
+// ─────────────────────────────────────────
+// BARRA DE BUSCA
+// ─────────────────────────────────────────
+@Composable
+fun SearchBarRow(
+    query: String,
+    onQueryChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        placeholder = { Text("Buscar parceiro ou serviço...", fontSize = 14.sp, color = Slate500) },
+        leadingIcon = { Icon(Icons.Default.Search, null, tint = Forest600) },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(Icons.Default.Close, null, tint = Slate500)
+                }
+            }
+        },
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Forest600,
+            unfocusedBorderColor = Slate200,
+            focusedContainerColor = Color.White,
+            unfocusedContainerColor = Color.White,
+            focusedTextColor = Slate800,
+            unfocusedTextColor = Slate800
+        ),
+        singleLine = true
+    )
 }
 
 // ─────────────────────────────────────────
@@ -742,8 +791,6 @@ fun PartnerCard(partner: Partner) {
                                     modifier = Modifier.size(15.dp),
                                     tint = Color.White
                                 )
-                                Spacer(Modifier.width(4.dp))
-                                Text("WhatsApp", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
 
@@ -761,6 +808,33 @@ fun PartnerCard(partner: Partner) {
                             Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(15.dp))
                             Spacer(Modifier.width(4.dp))
                             Text("Mapa", fontSize = 12.sp)
+                        }
+
+                        // Compartilhar
+                        OutlinedButton(
+                            onClick = {
+                                val mapsUrl = "https://www.google.com/maps/search/?api=1&query=${urlEncode("${partner.name} ${partner.address}")}"
+                                val shareMsg = """
+                                    Olha esse desconto para os associados da Pax Rio Verde!
+                                    
+                                    🌟 *${partner.name}*
+                                    🎁 *Desconto:* ${partner.discount.replace("\n", " ")}
+                                    📍 *Endereço:* ${partner.address}
+                                    🗺️ *Ver no mapa:* $mapsUrl
+                                    
+                                    Apresente seu cartão Pax Rio Verde e economize!
+                                """.trimIndent()
+                                shareText(shareMsg, "Compartilhar Parceiro")
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Forest600),
+                            border = ButtonDefaults.outlinedButtonBorder,
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
+                        ) {
+                            Icon(Icons.Default.Share, null, modifier = Modifier.size(15.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Enviar", fontSize = 12.sp)
                         }
                     }
                 }

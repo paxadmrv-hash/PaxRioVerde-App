@@ -248,6 +248,30 @@ object ApiService {
         }.body()
     }
 
+    suspend fun gerarCartaoPix(
+        idcaixa: Int,
+        idcliente: Int,
+        tipo: String,
+        nomeDependente: String
+    ): GerarCartaoPixResponse {
+        return client.post("gerar_cartao_pix_app") {
+            setBody(FormDataContent(Parameters.build {
+                append("idcaixa", idcaixa.toString())
+                append("idcliente", idcliente.toString())
+                append("tipo", tipo)
+                append("nomedependente", nomeDependente)
+            }))
+        }.body()
+    }
+
+    suspend fun verificarPixPago(identificadorPix: String): VerificarPixPagoResponse {
+        return client.get("verifica_pix_pago") {
+            url {
+                parameters.append("identificador_pix", identificadorPix)
+            }
+        }.body()
+    }
+
     suspend fun listaPets(idcliente: Int): PetsResponse {
         return client.post("lista_pets_app") {
             setBody(FormDataContent(Parameters.build {

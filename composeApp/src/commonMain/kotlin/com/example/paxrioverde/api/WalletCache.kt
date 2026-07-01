@@ -17,15 +17,6 @@ object WalletCache {
     
     private val sessionManager = SessionManager()
 
-    // Rastreia se houve uma geração de cartão nesta sessão ou em sessões anteriores (persistido)
-    var pendingCardFee by mutableStateOf<String?>(sessionManager.getPendingCardFee())
-        private set
-
-    fun updatePendingCardFee(fee: String?) {
-        pendingCardFee = fee
-        sessionManager.savePendingCardFee(fee)
-    }
-
     val totalValorCartoes: Double
         get() = cartoesList.sumOf { 
             it.valor?.replace(",", ".")?.toDoubleOrNull() ?: 0.0 
@@ -73,6 +64,5 @@ object WalletCache {
         cartoesList.clear()
         dependentesList.clear()
         loadedBitmaps.clear()
-        // Mantém pendingCardFee para persistir o aviso na sessão e no storage
     }
 }

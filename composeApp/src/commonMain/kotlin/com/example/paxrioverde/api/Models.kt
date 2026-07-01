@@ -126,6 +126,22 @@ data class GerarCartaoResponse(
 )
 
 @Serializable
+data class GerarCartaoPixResponse(
+    @SerialName("statusCode") val statusCode: Int? = null,
+    @SerialName("success") val success: Boolean,
+    @SerialName("pix") val pix: String? = null,
+    @SerialName("identificador_pix") val identificador_pix: String? = null,
+    @SerialName("message") val message: String? = null
+)
+
+@Serializable
+data class VerificarPixPagoResponse(
+    @SerialName("status") val status: String? = null,
+    @SerialName("pago") val pago: Boolean,
+    @SerialName("mensagem") val mensagem: String? = null
+)
+
+@Serializable
 data class PetsResponse(
     @SerialName("statusCode") val statusCode: Int? = null,
     @SerialName("success") val success: Boolean,
