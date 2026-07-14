@@ -1,0 +1,6 @@
+- [ ] Adicionar dependências do Firebase no `libs.versions.toml`
+- [ ] Configurar plugins nos arquivos `build.gradle.kts`
+- [ ] Criar `MyFirebaseMessagingService.kt` no Android
+- [ ] Registrar serviço no `AndroidManifest.xml`
+- [ ] Configurar Firebase no `AppDelegate.swift` (iOS)
+- [ ] Sincronizar Gradle e verificar build

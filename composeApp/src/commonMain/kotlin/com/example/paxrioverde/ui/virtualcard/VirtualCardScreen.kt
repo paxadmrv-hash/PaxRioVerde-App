@@ -101,7 +101,7 @@ fun VirtualCardScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(top = paddingValues.calculateTopPadding())
         ) {
             // Área do Cartão com design estilo Carrossel
             Column(
@@ -199,6 +199,7 @@ fun VirtualCardScreen(
                     .weight(1f)
                     .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                     .background(WalletCardBg)
+                    .navigationBarsPadding()
                     .padding(24.dp)
             ) {
                 Button(
@@ -458,9 +459,9 @@ fun GerarCartaoDialog(
     val scope = rememberCoroutineScope()
     val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
 
-    val valorFormatado = remember(valorCartao) {
-        val valor = if (valorCartao.isNullOrEmpty() || valorCartao == "0,00" || valorCartao == "0.00") "5,00" else valorCartao
-        if (valor.contains("R$")) valor else "R$ $valor"
+    // Calcula a nova validade baseada na fidelidade (WalletCache)
+    val calculatedValidity = remember(WalletCache.mensalidadesList.size) {
+        WalletCache.getCalculatedValidity("") 
     }
 
     Dialog(onDismissRequest = { 
@@ -480,6 +481,28 @@ fun GerarCartaoDialog(
                 when (val state = uiState) {
                     is VirtualCardState.Idle -> {
                         Text("Gerar Novo Cartão", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = BrandLightGreen, modifier = Modifier.padding(bottom = 16.dp))
+
+                        if (calculatedValidity.isNotEmpty()) {
+                            Surface(
+                                color = BrandLightGreen.copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Info, null, tint = BrandLightGreen, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Seu novo cartão será válido até: $calculatedValidity",
+                                        fontSize = 12.sp,
+                                        color = Color.Black,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
 
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { isTitular = true }) {
                             RadioButton(selected = isTitular, onClick = { isTitular = true }, colors = RadioButtonDefaults.colors(selectedColor = BrandLightGreen))
@@ -538,16 +561,20 @@ fun GerarCartaoDialog(
                         }
 
                         Spacer(modifier = Modifier.height(24.dp))
-                        Text("Custo Adicional: $valorFormatado", color = Color.Gray, fontSize = 14.sp)
-                        Spacer(modifier = Modifier.height(8.dp))
+                        
                         Button(
                             onClick = { 
                                 if (isTitular || selectedDependente != null) {
-                                    viewModel.gerarCartaoPix(
-                                        idcaixa = idcaixa,
+                                    viewModel.gerarCartaoDireto(
                                         idcliente = idcliente,
                                         tipo = if (isTitular) "titular" else "dependente",
                                         nomeDependente = if (isTitular) "" else selectedDependente?.nomeDependente ?: "",
+                                        idcontrato = idcontrato,
+                                        idconvenio = idconvenio,
+                                        idmensalidade = idmensalidade,
+                                        dtvencimento = calculatedValidity,
+                                        idfilial = idfilial,
+                                        idcaixa = idcaixa,
                                         estiloSelecionado = selectedEstilo
                                     )
                                 }
@@ -556,7 +583,7 @@ fun GerarCartaoDialog(
                             colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("GERAR COM PIX", color = Color.White, fontWeight = FontWeight.Bold)
+                            Text("GERAR CARTÃO AGORA", color = Color.White, fontWeight = FontWeight.Bold)
                         }
                         TextButton(onClick = onDismiss) { Text("Fechar", color = Color.Gray) }
                     }

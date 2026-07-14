@@ -79,6 +79,7 @@ val benefitsCategories = listOf(
     BenefitsCategory("Todos",        Icons.Default.GridView),
     BenefitsCategory("ABA",          Icons.Default.Extension),
     BenefitsCategory("Saúde",        Icons.Default.HealthAndSafety),
+    BenefitsCategory("Pet",          Icons.Default.Pets),
     BenefitsCategory("Farmácias",    Icons.Default.MedicalServices),
     BenefitsCategory("Laboratórios", Icons.Default.Science),
     BenefitsCategory("Óticas",       Icons.Default.RemoveRedEye),
@@ -372,7 +373,7 @@ val realPartners: List<Partner> = listOf(
         "64999791070", "64999791070", Icons.Default.FitnessCenter, "Fitness"),
     Partner("Clinica Veterinária Rio Verde", "10% à vista (dinheiro ou pix), 5% (débito) e 3% (crédito) em consulta e cirurgia; 7% à vista (dinheiro ou pix) 5% (débito) e 3% (crédito) em medicações",
         "R. Rio Verde, 240 - Vila Maria, Rio Verde",
-        "6492554900", "6492554900", Icons.Default.Pets, "Clínicas"),
+        "6492554900", "6492554900", Icons.Default.Pets, "Pet"),
     Partner("Rio Imunne - Clinica de Vacinação", "6% de desconto em todas as vacinas",
         "R. Abel Pereira de Castro, 709 - Setor Central, Rio Verde",
         "64992527000", "64992527000", Icons.Default.LocalHospital, "Clínicas"),
@@ -384,7 +385,7 @@ val realPartners: List<Partner> = listOf(
         "6499644-3222", "6499644-3222", Icons.Default.LocalHospital, "Clínicas"),
     Partner("CLÍNICA VETERINÁRIA AGRO RAÇA", "5% de desconto no valor total",
         "Rio Verde - GO",
-        "64992042313", "64992042313", Icons.Default.Pets, "Clínicas"),
+        "64992042313", "64992042313", Icons.Default.Pets, "Pet"),
 
     // MONTIVIDIU
     Partner("Clínica CMD", "10% a 40% em toda a clínica",

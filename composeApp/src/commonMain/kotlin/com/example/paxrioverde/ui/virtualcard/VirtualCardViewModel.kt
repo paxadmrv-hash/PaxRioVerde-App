@@ -59,6 +59,44 @@ class VirtualCardViewModel : ViewModel() {
         }
     }
 
+    fun gerarCartaoDireto(
+        idcliente: Int,
+        tipo: String,
+        nomeDependente: String,
+        idcontrato: Int,
+        idconvenio: Int,
+        idmensalidade: Int,
+        dtvencimento: String,
+        idfilial: Int,
+        idcaixa: Int,
+        estiloSelecionado: String
+    ) {
+        viewModelScope.launch {
+            _uiState.value = VirtualCardState.Loading
+            try {
+                val response = ApiService.gerarCartao(
+                    idcliente = idcliente,
+                    tipo = tipo,
+                    nomeDependente = nomeDependente,
+                    idcontrato = idcontrato,
+                    idconvenio = idconvenio,
+                    valor = "0,00",
+                    idmensalidade = idmensalidade,
+                    dtvencimento = dtvencimento,
+                    idfilial = idfilial,
+                    idcaixa = idcaixa
+                )
+                if (response.success) {
+                    onPaymentSuccess(idcliente, estiloSelecionado)
+                } else {
+                    _uiState.value = VirtualCardState.Error(response.message ?: "Erro ao gerar cartão")
+                }
+            } catch (e: Exception) {
+                _uiState.value = VirtualCardState.Error("Erro de conexão: ${e.message}")
+            }
+        }
+    }
+
     private suspend fun onPaymentSuccess(idcliente: Int, estiloSelecionado: String) {
         val oldIds = WalletCache.cartoesList.map { it.idControle }.toSet()
         

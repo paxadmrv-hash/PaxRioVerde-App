@@ -118,12 +118,12 @@ fun FinanceScreen(
     val historyInvoices = remember(selectedYear, anosData, oldestUnpaid) {
         val allForYear = anosData.find { it.ano == selectedYear }?.mensalidades ?: emptyList()
         
-        // Identifica as próximas 3 mensalidades não pagas (incluindo a atual se não estiver paga)
+        // Identifica a próxima mensalidade não paga (incluindo a atual se não estiver paga)
         val futureUnpaidIds = allForYear
             .filter { !it.pago }
             .mapNotNull { item -> parseDate(item.dtvencimento)?.let { it to item } }
             .sortedBy { it.first }
-            .take(3)
+            .take(1)
             .map { it.second.idmensalidade }
             .toSet()
 
@@ -131,7 +131,7 @@ fun FinanceScreen(
             // 1. Mostrar se já está pago
             if (item.pago) return@filter true
             
-            // 2. Mostrar se for uma das próximas 3 a vencer
+            // 2. Mostrar se for a próxima a vencer
             if (futureUnpaidIds.contains(item.idmensalidade)) return@filter true
             
             // 3. Mostrar se estiver vencida (mês anterior ou anos anteriores)
@@ -288,10 +288,10 @@ fun FinanceScreen(
 
                     items(historyInvoices) { item ->
                         val unpaidList = historyInvoices.filter { !it.pago }.sortedBy { parseDate(it.dtvencimento) }
-                        val isLocked = unpaidList.size >= 3 && item.idmensalidade == unpaidList[2].idmensalidade
-                        val isFirstTwoUnpaid = unpaidList.take(2).any { it.idmensalidade == item.idmensalidade }
+                        val isLocked = unpaidList.size >= 2 && item.idmensalidade != unpaidList[0].idmensalidade
+                        val isFirstUnpaid = unpaidList.take(1).any { it.idmensalidade == item.idmensalidade }
                         
-                        val canSelect = item.pago || isFirstTwoUnpaid
+                        val canSelect = item.pago || isFirstUnpaid
 
                         HistoryInvoiceItem(
                             item = item,
@@ -378,33 +378,31 @@ fun FinanceHeader(
                     }
                 }
 
-                if (showBoleto) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Surface(
-                        color = Color.White.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
+                Spacer(modifier = Modifier.height(16.dp))
+                Surface(
+                    color = Color.White.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        Row(
-                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Pague com Pix ou Boleto e ganhe 5% de desconto até a data de vencimento.",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Pague até o vencimento e ganhe 5% de desconto.",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
                     }
                 }
             }
