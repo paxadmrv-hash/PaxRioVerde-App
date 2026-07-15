@@ -60,34 +60,39 @@ class VirtualCardViewModel : ViewModel() {
     }
 
     fun gerarCartaoDireto(
+        idcaixa: Int,
         idcliente: Int,
         tipo: String,
-        nomeDependente: String,
-        idcontrato: Int,
-        idconvenio: Int,
-        idmensalidade: Int,
-        dtvencimento: String,
-        idfilial: Int,
-        idcaixa: Int,
-        estiloSelecionado: String
+        nomeDependente: String?,
+        isGratuito: Boolean,
+        idcontrato: Int = 0,
+        idconvenio: Int = 0,
+        cpfDependente: String? = null,
+        dtvencimento: String? = null,
+        parentesco: String? = null,
+        idfilial: Int = 0
     ) {
         viewModelScope.launch {
             _uiState.value = VirtualCardState.Loading
             try {
+                val gratuitoString = if (isGratuito) "S" else "N"
+                
                 val response = ApiService.gerarCartao(
+                    idcaixa = idcaixa,
                     idcliente = idcliente,
                     tipo = tipo,
                     nomeDependente = nomeDependente,
+                    gratuito = gratuitoString,
                     idcontrato = idcontrato,
                     idconvenio = idconvenio,
-                    valor = "0,00",
-                    idmensalidade = idmensalidade,
+                    cpfDependente = cpfDependente,
                     dtvencimento = dtvencimento,
-                    idfilial = idfilial,
-                    idcaixa = idcaixa
+                    parentesco = parentesco,
+                    idfilial = idfilial
                 )
+                
                 if (response.success) {
-                    onPaymentSuccess(idcliente, estiloSelecionado)
+                    onPaymentSuccess(idcliente, "Adulto") // Estilo padrão para refresh
                 } else {
                     _uiState.value = VirtualCardState.Error(response.message ?: "Erro ao gerar cartão")
                 }

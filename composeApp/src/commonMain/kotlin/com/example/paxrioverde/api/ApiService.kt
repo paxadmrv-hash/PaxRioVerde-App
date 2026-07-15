@@ -162,89 +162,53 @@ object ApiService {
     }
 
     suspend fun gerarCartao(
+        idcaixa: Int,
         idcliente: Int,
         tipo: String,
-        nomeDependente: String,
-        idcontrato: Int,
-        idconvenio: Int,
-        valor: String,
-        idmensalidade: Int,
-        dtvencimento: String,
-        idfilial: Int,
-        idcaixa: Int
+        nomeDependente: String?,
+        gratuito: String,
+        idcontrato: Int = 0,
+        idconvenio: Int = 0,
+        cpfDependente: String? = null,
+        dtvencimento: String? = null,
+        parentesco: String? = null,
+        idfilial: Int = 0
     ): GerarCartaoResponse {
         return client.post("gerar_cartao_app") {
-            setBody(FormDataContent(Parameters.build {
-                // Identificação básica
-                append("idcliente", idcliente.toString())
-                append("id_cliente", idcliente.toString())
-                append("ID_CLIENTE", idcliente.toString())
+            url {
+                parameters.clear()
+                // Parâmetros Base
+                parameters.set("idcaixa", idcaixa.toString())
+                parameters.set("id_caixa", idcaixa.toString())
+                parameters.set("idcliente", idcliente.toString())
+                parameters.set("id_cliente", idcliente.toString())
                 
-                append("idcontrato", idcontrato.toString())
-                append("id_contrato", idcontrato.toString())
-                append("ID_CONTRATO", idcontrato.toString())
+                // Parâmetros de Tipo e Dependência
+                parameters.set("tipo", tipo)
+                parameters.set("dep", if (tipo.lowercase().contains("titular")) "N" else "S")
+                parameters.set("parentesco", parentesco ?: "")
                 
-                append("idconvenio", idconvenio.toString())
-                append("id_convenio", idconvenio.toString())
-                append("ID_CONVENIO", idconvenio.toString())
+                // Nome do Dependente (Múltiplos formatos para garantir match)
+                val nome = nomeDependente ?: ""
+                parameters.set("nomedependente", nome)
+                parameters.set("nome_dependente", nome)
+                parameters.set("nome", nome)
                 
-                append("tipo", tipo)
-                append("nomedependente", nomeDependente)
-                append("nome_dependente", nomeDependente)
-
-                // Parâmetros de Routing Financeiro
-                append("idcaixa", idcaixa.toString())
-                append("id_caixa", idcaixa.toString())
-                append("IDCAIXA", idcaixa.toString())
-                append("ID_CAIXA", idcaixa.toString())
+                // Regra de Gratuidade (Conforme orientação do backend)
+                parameters.set("gratuito", gratuito)
                 
-                append("idfilial", idfilial.toString())
-                append("id_filial", idfilial.toString())
-                append("IDFILIAL", idfilial.toString())
-                append("ID_FILIAL", idfilial.toString())
+                // Vínculos de Plano (Essencial para localizar a vaga do dependente)
+                if (idcontrato != 0) parameters.set("idcontrato", idcontrato.toString())
+                if (idconvenio != 0) parameters.set("idconvenio", idconvenio.toString())
+                if (idfilial != 0) parameters.set("idfilial", idfilial.toString())
                 
-                append("dtvencimento", dtvencimento)
-                append("data_vencimento", dtvencimento)
-                append("dt_vencimento", dtvencimento)
-                append("DATA_VENCIMENTO", dtvencimento)
-                
-                // Parâmetros financeiros e IDs de mensalidade
-                append("idmensalidade", idmensalidade.toString())
-                append("id_mensalidade", idmensalidade.toString())
-                append("IDMENSALIDADE", idmensalidade.toString())
-                append("ID_MENSALIDADE", idmensalidade.toString())
-
-                val valorLimpo = valor.replace(",", ".")
-                append("valor", valorLimpo)
-                append("VALOR", valorLimpo)
-                append("valor_cartao", valorLimpo)
-                append("VALOR_CARTAO", valorLimpo)
-                append("valor_cartao_adicional", valorLimpo)
-
-                // Geração de Cobrança Formal (Conforme Backend)
-                append("gerar_financeiro", "SIM")
-                append("GERAR_FINANCEIRO", "SIM")
-                append("lancar_proxima", "S")
-                append("LANCAR_PROXIMA", "S")
-                append("lancar_proxima_mensalidade", "S")
-                append("ADC_MENSALIDADE", "1")
-                append("adc_mensalidade", "1")
-                append("ADD_MENSALIDADE", "1")
-                append("taxa_adesao", "S")
-                append("TAXA_ADESAO", "S")
-                append("gerar_boleto", "S")
-                append("GERAR_BOLETO", "S")
-                append("SITUACAO", "PENDENTE")
-                append("situacao", "PENDENTE")
-                append("gerar_debito_adicional", "S")
-                append("GERAR_DEBITO_ADICIONAL", "S")
-                
-                // Vincular a Mensalidades
-                append("inserir_mensalidade", "S")
-                append("INSERIR_MENSALIDADE", "S")
-                append("id_conta_corrente", "S")
-                append("vincular_financeiro", "S")
-            }))
+                // Metadados
+                parameters.set("dtvencimento", dtvencimento ?: "")
+                parameters.set("cpf", cpfDependente ?: "")
+                parameters.set("is_virtual", "S")
+                parameters.set("cartao_virtual", "S")
+                parameters.set("situacao", "ATIVO")
+            }
         }.body()
     }
 

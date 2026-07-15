@@ -249,12 +249,10 @@ fun VirtualCardScreen(
                 viewModel.resetState()
             },
             idcliente = idcliente,
+            idcaixa = idcaixa,
             idcontrato = idcontrato,
             idconvenio = idconvenio,
-            idmensalidade = idmensalidade,
-            idcaixa = idcaixa,
             idfilial = idfilial,
-            dtvencimento = dtvencimento,
             valorCartao = valorCartao,
             onSuccess = onCardGenerated,
             onNavigateToFinance = onNavigateToFinance,
@@ -434,12 +432,10 @@ fun CardExpansionDialog(item: CartaoItem, onDismiss: () -> Unit) {
 fun GerarCartaoDialog(
     onDismiss: () -> Unit,
     idcliente: Int,
+    idcaixa: Int,
     idcontrato: Int,
     idconvenio: Int,
-    idmensalidade: Int,
-    idcaixa: Int,
-    idfilial: Int,
-    dtvencimento: String,
+    idfilial: Int, // Adicionado de volta
     valorCartao: String? = null,
     onSuccess: () -> Unit = {},
     onNavigateToFinance: () -> Unit = {},
@@ -566,16 +562,17 @@ fun GerarCartaoDialog(
                             onClick = { 
                                 if (isTitular || selectedDependente != null) {
                                     viewModel.gerarCartaoDireto(
+                                        idcaixa = idcaixa,
                                         idcliente = idcliente,
                                         tipo = if (isTitular) "titular" else "dependente",
-                                        nomeDependente = if (isTitular) "" else selectedDependente?.nomeDependente ?: "",
+                                        nomeDependente = if (isTitular) null else selectedDependente?.nomeDependente,
+                                        isGratuito = true,
                                         idcontrato = idcontrato,
                                         idconvenio = idconvenio,
-                                        idmensalidade = idmensalidade,
+                                        cpfDependente = if (isTitular) null else selectedDependente?.cpf,
                                         dtvencimento = calculatedValidity,
-                                        idfilial = idfilial,
-                                        idcaixa = idcaixa,
-                                        estiloSelecionado = selectedEstilo
+                                        parentesco = if (isTitular) "TITULAR" else selectedDependente?.parentesco,
+                                        idfilial = idfilial
                                     )
                                 }
                             },
