@@ -1,41 +1,26 @@
-# Integração de Push Notifications (Firebase)
+# Ajuste na Geração de Cartão sem Cobrança de Mensalidade (Iteração 3)
 
-Implementamos a base para suporte a notificações push (FCM) em ambas as plataformas, Android e iOS.
+Após as tentativas anteriores, reforçamos ainda mais o bloqueio de geração financeira no backend. Nesta iteração, removemos referências a mensalidades existentes e status de pagamento que poderiam estar disparando a criação de registros financeiros.
 
-## O que foi feito
+## Alterações Realizadas
 
-### Android (FCM)
-- **Dependências**: Adicionamos `firebase-messaging` ao projeto.
-- **Serviço de Mensageria**: Criamos o `MyFirebaseMessagingService.kt` que:
-    - Gera e exibe o token do FCM no log (útil para testes).
-    - Processa notificações recebidas e as exibe usando o `NotificationManager` nativo do Android.
-    - Ao clicar na notificação, o app é aberto na tela principal.
-- **Manifest**: Registramos o serviço e garantimos as permissões necessárias.
+### Camada de API
+- **[ApiService.kt](file:///C:/Users/arielson.silva/PaxRioVerde/composeApp/src/commonMain/kotlin/com/example/paxrioverde/api/ApiService.kt)**:
+    - **Zerar IDs Financeiros**: `idmensalidade` e `id_mensalidade` voltaram a ser `"0"`.
+    - **Alteração de Status**: Mudamos de `SITUACAO = "PAGO"` para `SITUACAO = "ATIVO"`. O status "PAGO" pode estar forçando o backend a criar um registro para ser quitado.
+    - **Desativação de Vínculos**: `vincular_financeiro` e `vincular_mensalidade` agora são `"N"`.
+    - **Flags de Bloqueio Extras**: Adicionamos parâmetros para sinalizar que é uma operação não financeira:
+        - `gerar_cobranca` -> `"N"`
+        - `lancar_financeiro` -> `"N"`
+        - `venda` -> `"N"`
+    - **Sinalização de Cartão Virtual**: Adicionamos `is_virtual = "S"` e `cartao_virtual = "S"`.
+    - **Simplificação de Valor**: Alterado de `"0.00"` para `"0"`.
 
-### iOS (Firebase)
-- **Ciclo de Vida**: Atualizamos o `iOSApp.swift` para incluir um `AppDelegate`.
-- **Configuração**:
-    - O Firebase é inicializado no lançamento do app.
-    - O app solicita permissão para notificações (Alerta, Som, Badge) logo na abertura.
-    - Implementamos os delegados para capturar o token do FCM no iOS.
+## Como Funciona Agora
+O aplicativo agora envia um comando "limpo" ao backend. Ao não vincular a nenhuma mensalidade e remover o status de pagamento, o sistema deve tratar o `gerar_cartao_app` apenas como um comando de cadastro de registro, sem disparar gatilhos financeiros de "venda" ou "cobrança".
 
-## Próximos Passos (Ação Requerida)
+> [!IMPORTANT]
+> O valor é explicitamente `"0"` e todas as flags de geração de taxa ou mensalidade estão desativadas.
 
-Para que as notificações funcionem, você precisa realizar os seguintes passos manuais:
-
-### 1. Arquivos de Configuração
-- Coloque o `google-services.json` em: `composeApp/` (na raiz do módulo Android).
-- Adicione o `GoogleService-Info.plist` ao seu projeto no Xcode dentro da pasta `iosApp/iosApp/`.
-
-### 2. Dependências iOS (Xcode)
-Como o projeto utiliza SwiftUI, você deve adicionar os pacotes do Firebase via **Swift Package Manager (SPM)** no Xcode:
-- URL: `https://github.com/firebase/firebase-ios-sdk`
-- Selecione: `FirebaseMessaging`.
-
-### 3. Permissões
-- No Xcode, habilite as **Capabilities**:
-    - `Push Notifications`
-    - `Background Modes` -> `Remote notifications`
-
-> [!TIP]
-> Você pode testar o envio de notificações diretamente pelo Console do Firebase usando o token que aparecerá no Logcat do Android Studio ou no Console do Xcode.
+## Próximos Passos
+- Por favor, realize um novo teste. Se o problema persistir, pode ser necessário verificar a lógica interna do script `gerar_cartao_app` no servidor, pois o app já esgotou as possibilidades de parametrização de bloqueio.

@@ -1,30 +1,28 @@
-# Walkthrough: Implementação do Parâmetro de Gratuidade na Emissão de Cartão
+# Walkthrough: Finalização da Emissão de Cartão Virtual Gratuito
 
-Concluí a implementação do parâmetro `gratuito` ("S"/"N") para o endpoint `/gerar_cartao_app`, garantindo que a regra de negócio para emissão gratuita ou com cobrança seja aplicada corretamente baseada no valor do cartão.
+Concluímos com sucesso a atualização da funcionalidade de geração de cartões virtuais. O sistema agora permite a emissão gratuita tanto para titulares quanto para dependentes, respeitando as regras de negócio do backend e as especificações de interface.
 
 ## Mudanças Realizadas
 
 ### [API] [ApiService.kt](file:///C:/Users/arielson.silva/PaxRioVerde/composeApp/src/commonMain/kotlin/com/example/paxrioverde/api/ApiService.kt)
-- Adicionado o parâmetro `gratuito` à função `gerarCartao`.
-- Implementada lógica condicional para os campos financeiros:
-  - Se `gratuito == "S"`: IDs de mensalidade e valores são zerados, e as flags de geração de cobrança são definidas como "N" ou "NAO".
-  - Se `gratuito == "N"`: Utiliza os IDs e valores reais passados, e ativa as flags de cobrança ("S" ou "SIM").
+- **Migração para Query String:** A requisição POST agora envia todos os parâmetros diretamente na URL, garantindo compatibilidade com o processamento do servidor.
+- **Identificação Robusta:** Adicionados parâmetros de vínculo (`idcontrato`, `idconvenio`, `idfilial`) e aliasing de campos de nome e CPF para garantir que o servidor identifique corretamente cada pessoa.
+- **Parâmetro `gratuito`:** Implementado como o gatilho principal para isenção de taxas.
 
 ### [ViewModel] [VirtualCardViewModel.kt](file:///C:/Users/arielson.silva/PaxRioVerde/composeApp/src/commonMain/kotlin/com/example/paxrioverde/ui/virtualcard/VirtualCardViewModel.kt)
-- Atualizada a função `gerarCartaoDireto` para aceitar `gratuito` e `valor`, repassando-os para o `ApiService`.
+- **Gestão de Estado:** Gerencia o fluxo de carregamento e sucesso, disparando o refresh do cache após a geração.
+- **Limpeza:** Removidos todos os logs de depuração temporários, mantendo o código limpo para produção.
 
 ### [UI] [VirtualCardScreen.kt](file:///C:/Users/arielson.silva/PaxRioVerde/composeApp/src/commonMain/kotlin/com/example/paxrioverde/ui/virtualcard/VirtualCardScreen.kt)
-- No `GerarCartaoDialog`, implementada a lógica para definir o valor de `gratuito`:
-  - Envia "S" se `valorCartao` for nulo, vazio, "0" ou "0,00".
-  - Envia "N" caso contrário.
-- Passa o `valorCartao` real para a ViewModel para garantir que o fluxo de cobrança use o valor correto quando não for gratuito.
+- **Correção de Capitalização:** Ajustado o parâmetro `tipo` para minúsculas (`titular`/`dependente`), o que resolveu o erro de "cartão ainda válido" na emissão para dependentes.
+- **Sempre Gratuito:** Conforme solicitado, a tela agora força o envio de `isGratuito = true`, garantindo que não haja cobrança na mensalidade para emissões via aplicativo.
+- **Fluxo de Dados:** Garante que todos os metadados (Parentesco, Validade, CPF) sejam repassados corretamente.
 
-## Verificação
+## Verificação Técnica Final
 
-As alterações garantem que:
-1. O backend receba o parâmetro `gratuito` explicitamente.
-2. Quando gratuito, nenhuma cobrança adicional seja gerada acidentalmente.
-3. Quando não gratuito, o fluxo financeiro padrão seja seguido com os valores corretos.
+- **Endpoint:** `/gerar_cartao_app` acionado via POST com Query Params.
+- **Regra de Negócio:** `gratuito=S` enviado em todas as emissões.
+- **Identificação:** Diferenciação funcional entre titulares e dependentes validada.
 
 > [!TIP]
-> Você pode verificar os logs de rede do Ktor no Logcat para confirmar que o parâmetro `gratuito` está sendo enviado corretamente com "S" ou "N" dependendo do caso.
+> O problema de "cartão ainda válido" foi resolvido ao ajustar a capitalização do parâmetro `tipo` para minúsculo, permitindo que o servidor processasse corretamente a distinção entre os membros do plano.

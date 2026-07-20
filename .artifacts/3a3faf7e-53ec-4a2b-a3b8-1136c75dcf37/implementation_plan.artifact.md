@@ -1,54 +1,29 @@
-# Integração de Push Notifications (Firebase Cloud Messaging)
+# Ajuste na Geração de Cartão sem Cobrança de Mensalidade (Iteração 3)
 
-Este plano descreve a integração do Firebase Cloud Messaging (FCM) para suportar notificações remotas no Android e iOS.
+As tentativas anteriores de vincular a mensalidade ou zerar o ID não impediram o backend de gerar um novo registro financeiro. Nesta iteração, seremos ainda mais agressivos e "limpos" nos parâmetros enviados.
 
 ## User Review Required
 
-> [!IMPORTANT]
-> **Arquivos de Configuração do Firebase:**
-> Você precisará adicionar os seguintes arquivos manualmente após as alterações no código:
-> 1. `google-services.json` em `C:/Users/arielson.silva/PaxRioVerde/composeApp/`
-> 2. `GoogleService-Info.plist` em `C:/Users/arielson.silva/PaxRioVerde/iosApp/iosApp/` (via Xcode)
+> [!WARNING]
+> Vamos remover alguns parâmetros que podem estar disparando a lógica de criação de mensalidade no backend, como o status "PAGO" (que pode forçar a criação de um registro para ser marcado como pago) e o vínculo com mensalidades existentes.
 
 ## Proposed Changes
 
-### [Component] Configuração de Dependências
+### Camada de API
 
-#### [MODIFY] [libs.versions.toml](file:///C:/Users/arielson.silva/PaxRioVerde/gradle/libs.versions.toml)
-- Adicionar versões e bibliotecas do Firebase BOM e Messaging.
-- Adicionar o plugin `google-services`.
+#### [MODIFY] [ApiService.kt](file:///C:/Users/arielson.silva/PaxRioVerde/composeApp/src/commonMain/kotlin/com/example/paxrioverde/api/ApiService.kt)
 
-#### [MODIFY] [build.gradle.kts (root)](file:///C:/Users/arielson.silva/PaxRioVerde/build.gradle.kts)
-- Adicionar o plugin do Google Services ao classpath do build.
-
-#### [MODIFY] [build.gradle.kts (composeApp)](file:///C:/Users/arielson.silva/PaxRioVerde/composeApp/build.gradle.kts)
-- Aplicar o plugin `com.google.gms.google-services`.
-- Adicionar as dependências do Firebase ao `androidMain`.
-
----
-
-### [Component] Android (FCM)
-
-#### [NEW] [MyFirebaseMessagingService.kt](file:///C:/Users/arielson.silva/PaxRioVerde/composeApp/src/androidMain/kotlin/com/example/paxrioverde/util/MyFirebaseMessagingService.kt)
-- Implementar o serviço para receber mensagens e tokens do Firebase.
-- Lógica para exibir notificações em primeiro e segundo plano.
-
-#### [MODIFY] [AndroidManifest.xml](file:///C:/Users/arielson.silva/PaxRioVerde/composeApp/src/androidMain/AndroidManifest.xml)
-- Registrar o serviço de mensageria.
-- Adicionar metadados para ícones de notificação (opcional).
-
----
-
-### [Component] iOS (Native)
-
-#### [MODIFY] [AppDelegate.swift](file:///C:/Users/arielson.silva/PaxRioVerde/iosApp/iosApp/AppDelegate.swift)
-- Configurar o Firebase no lançamento do app.
-- Registrar para notificações remotas.
-- Implementar delegados do `UNUserNotificationCenter` e `Messaging`.
+Ajustaremos o método `gerarCartao` com as seguintes mudanças:
+1.  **Zerar IDs Financeiros**: `idmensalidade` e `id_mensalidade` voltarão a ser `"0"`.
+2.  **Remover `SITUACAO = "PAGO"`**: Para evitar que o sistema tente criar um registro financeiro "quitado".
+3.  **Desativar Vínculos**: `vincular_financeiro` e `vincular_mensalidade` serão `"N"`.
+4.  **Flags de Bloqueio Extras**: Adicionar `gerar_cobranca = "N"`, `lancar_financeiro = "N"` e `venda = "N"`.
+5.  **Sinalizar Cartão Virtual**: Adicionar `is_virtual = "S"` e `cartao_virtual = "S"`.
+6.  **Simplificar Valor**: Usar `"0"` em vez de `"0.00"`.
 
 ## Verification Plan
 
 ### Manual Verification
-1. **Compilação**: Verificar se o projeto compila após as mudanças de dependência.
-2. **Token**: Observar no Logcat/Console se o token do FCM é gerado no início do app.
-3. **Teste de Envio**: Enviar uma notificação de teste pelo console do Firebase usando o token gerado.
+- O usuário deve tentar gerar um novo cartão.
+- Validar se o cartão aparece na carteira.
+- Validar se **NÃO** apareceu nenhuma mensalidade nova no financeiro.

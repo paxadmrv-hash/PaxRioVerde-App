@@ -1,6 +1,5 @@
-- [ ] Adicionar dependências do Firebase no `libs.versions.toml`
-- [ ] Configurar plugins nos arquivos `build.gradle.kts`
-- [ ] Criar `MyFirebaseMessagingService.kt` no Android
-- [ ] Registrar serviço no `AndroidManifest.xml`
-- [ ] Configurar Firebase no `AppDelegate.swift` (iOS)
-- [ ] Sincronizar Gradle e verificar build
+- [x] Ajustar parâmetros de `gerarCartao` em `ApiService.kt` (Iteração 1)
+- [x] Ajustar parâmetros de `gerarCartao` em `ApiService.kt` (Iteração 2 - Vínculo)
+- [x] Ajustar parâmetros de `gerarCartao` em `ApiService.kt` (Iteração 3 - Agressivo)
+- [ ] Validar se as flags desativam a geração de mensalidade
+- [x] Criar walkthrough das alterações

@@ -90,8 +90,8 @@ android {
         applicationId = "br.com.paxrioverde.app"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = 35 // Definindo explicitamente para garantir conformidade
-        versionCode = 26
-        versionName = "2.1.6"
+        versionCode = 30
+        versionName = "2.1.9"
         
         ndk {
             debugSymbolLevel = "FULL"

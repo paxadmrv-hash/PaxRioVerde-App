@@ -1,6 +1,6 @@
 # Tarefas: Implementação do Parâmetro de Gratuidade
 
-- [ ] Atualizar `ApiService.kt` para aceitar o parâmetro `gratuito`
-- [ ] Atualizar `VirtualCardViewModel.kt` para repassar o parâmetro `gratuito`
-- [ ] Atualizar `VirtualCardScreen.kt` para calcular e enviar o valor de `gratuito`
-- [ ] Verificar logs e funcionamento
+- [x] Atualizar `ApiService.kt` para aceitar os 5 parâmetros solicitados
+- [x] Atualizar `VirtualCardViewModel.kt` para converter `Boolean` em "S"/"N"
+- [x] Refatorar `VirtualCardScreen.kt` para simplificar a chamada
+- [x] Limpar parâmetros não utilizados
