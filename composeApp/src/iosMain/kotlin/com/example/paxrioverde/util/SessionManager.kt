@@ -52,4 +52,12 @@ actual class SessionManager actual constructor() {
     actual fun savePetsJson(json: String) {
         userDefaults.setObject(json, "saved_pets_json")
     }
+
+    actual fun getCardStyle(idControle: Int): String? {
+        return userDefaults.stringForKey("card_style_$idControle")
+    }
+
+    actual fun saveCardStyle(idControle: Int, style: String) {
+        userDefaults.setObject(style, "card_style_$idControle")
+    }
 }

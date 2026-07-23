@@ -5,3 +5,5 @@ import androidx.compose.ui.graphics.ImageBitmap
 expect suspend fun renderPdfBase64ToBitmap(base64Str: String): ImageBitmap?
 
 expect fun isCardExpired(validity: String): Boolean
+
+expect fun ImageBitmap.toByteArray(): ByteArray?

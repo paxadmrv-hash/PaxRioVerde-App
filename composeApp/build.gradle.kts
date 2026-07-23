@@ -89,9 +89,9 @@ android {
     defaultConfig {
         applicationId = "br.com.paxrioverde.app"
         minSdk = libs.versions.android.minSdk.get().toInt()
-        targetSdk = 35 // Definindo explicitamente para garantir conformidade
-        versionCode = 30
-        versionName = "2.1.9"
+        targetSdk = libs.versions.android.targetSdk.get().toInt()
+        versionCode = 31
+        versionName = "3.1.10"
         
         ndk {
             debugSymbolLevel = "FULL"

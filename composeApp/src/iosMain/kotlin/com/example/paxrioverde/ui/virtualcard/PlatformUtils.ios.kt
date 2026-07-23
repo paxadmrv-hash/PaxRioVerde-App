@@ -1,6 +1,9 @@
 package com.example.paxrioverde.ui.virtualcard
 
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asSkiaBitmap
+import org.jetbrains.skia.EncodedImageFormat
+import org.jetbrains.skia.Image
 
 actual suspend fun renderPdfBase64ToBitmap(base64Str: String): ImageBitmap? {
     // Implementação para iOS usaria PDFKit, por enquanto retorna null para compilar
@@ -10,4 +13,9 @@ actual suspend fun renderPdfBase64ToBitmap(base64Str: String): ImageBitmap? {
 actual fun isCardExpired(validity: String): Boolean {
     // Implementação simplificada para iOS ou usar KNSDate
     return false
+}
+
+actual fun ImageBitmap.toByteArray(): ByteArray? {
+    val skiaBitmap = this.asSkiaBitmap()
+    return Image.makeFromBitmap(skiaBitmap).encodeToData(EncodedImageFormat.PNG, 100)?.bytes
 }

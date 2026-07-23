@@ -17,4 +17,7 @@ expect class SessionManager() {
 
     fun getSavedPetsJson(): String
     fun savePetsJson(json: String)
+
+    fun getCardStyle(idControle: Int): String?
+    fun saveCardStyle(idControle: Int, style: String)
 }

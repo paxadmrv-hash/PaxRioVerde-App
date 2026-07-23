@@ -1,0 +1,14 @@
+- [x] Adicionar `shareImage` em `ShareUtils.kt` (commonMain)
+- [x] Implementar `shareImage` em `ShareUtils.android.kt`
+- [x] Implementar `shareImage` em `ShareUtils.ios.kt`
+- [x] Configurar `FileProvider` no `AndroidManifest.xml`
+- [x] Criar arquivo `file_paths.xml` em `res/xml`
+- [x] Implementar captura de imagem e botão de compartilhar em `VirtualCardScreen.kt`
+- [x] Adicionar botão de compartilhar no `CardContent` (Carrossel)
+- [x] Adicionar `saveImageToGallery` em `ShareUtils.kt`
+- [x] Implementar `saveImageToGallery` em `ShareUtils.android.kt`
+- [x] Implementar `saveImageToGallery` em `ShareUtils.ios.kt`
+- [x] Adicionar `NSPhotoLibraryAddUsageDescription` no `Info.plist`
+- [x] Adicionar botão de baixar e corrigir quebra de texto em `VirtualCardScreen.kt`
+- [x] Implementar `formatCardName` em `VirtualCardScreen.kt`
+- [x] Aplicar abreviação de nome no `CardContent`

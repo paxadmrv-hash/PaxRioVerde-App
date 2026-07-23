@@ -6,10 +6,12 @@ import android.os.ParcelFileDescriptor
 import android.util.Base64
 import android.util.Log
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import com.example.paxrioverde.AndroidContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.time.LocalDate
@@ -49,6 +51,16 @@ actual suspend fun renderPdfBase64ToBitmap(base64Str: String): ImageBitmap? = wi
         bitmap.asImageBitmap()
     } catch (e: Exception) {
         Log.e("PDF_RENDER", "Erro ao converter PDF", e)
+        null
+    }
+}
+
+actual fun ImageBitmap.toByteArray(): ByteArray? {
+    val bitmap = this.asAndroidBitmap()
+    val stream = ByteArrayOutputStream()
+    return if (bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)) {
+        stream.toByteArray()
+    } else {
         null
     }
 }

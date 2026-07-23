@@ -20,4 +20,7 @@ actual class SessionManager actual constructor() {
 
     actual fun getSavedPetsJson(): String = prefs.getString("saved_pets_json", "") ?: ""
     actual fun savePetsJson(json: String) = prefs.edit().putString("saved_pets_json", json).apply()
+
+    actual fun getCardStyle(idControle: Int): String? = prefs.getString("card_style_$idControle", null)
+    actual fun saveCardStyle(idControle: Int, style: String) = prefs.edit().putString("card_style_$idControle", style).apply()
 }

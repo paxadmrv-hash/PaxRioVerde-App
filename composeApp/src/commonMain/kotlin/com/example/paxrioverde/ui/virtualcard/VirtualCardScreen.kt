@@ -21,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -32,11 +34,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.paxrioverde.api.*
+import com.example.paxrioverde.util.*
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 import org.jetbrains.compose.resources.painterResource
 import paxrioverde.composeapp.generated.resources.Res
 import paxrioverde.composeapp.generated.resources.*
+import androidx.compose.ui.draw.drawWithContent
 
 val WalletDarkBg = Color(0xFF13211c)
 val BrandLightGreen = Color(0xFF6fad2b)
@@ -45,8 +49,27 @@ val TextWhite = Color(0xFFE3E3E3)
 val TextGray = Color(0xFF8E8E93)
 val ExpiredRed = Color(0xFFFF5252)
 
-// Mapa para lembrar o estilo escolhido pelo usuário nesta sessão
-private val cardStyleOverrides = mutableStateMapOf<Int, String>()
+private fun formatCardName(name: String): String {
+    val parts = name.trim().split(" ").filter { it.isNotBlank() }
+    if (parts.size <= 2) return name.uppercase()
+    
+    val firstName = parts.first()
+    val lastName = parts.last()
+    
+    val result = StringBuilder(firstName)
+    for (i in 1 until parts.size - 1) {
+        val part = parts[i]
+        // Mantém preposições curtas sem abreviar, ou abrevia nomes maiores
+        if (part.lowercase() in listOf("da", "de", "do", "das", "dos", "e")) {
+            result.append(" ").append(part)
+        } else {
+            result.append(" ").append(part.first()).append(".")
+        }
+    }
+    result.append(" ").append(lastName)
+    
+    return result.toString().uppercase()
+}
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -71,6 +94,32 @@ fun VirtualCardScreen(
 
     var showGerarDialog by remember { mutableStateOf(false) }
     var expandedCard by remember { mutableStateOf<CartaoItem?>(null) }
+    var cardToShare by remember { mutableStateOf<CartaoItem?>(null) }
+
+    val silentCaptureLayer = rememberGraphicsLayer()
+    val scope = rememberCoroutineScope()
+
+    // Efeito para captura silenciosa (Carrossel)
+    LaunchedEffect(cardToShare) {
+        cardToShare?.let { card ->
+            try {
+                kotlinx.coroutines.delay(100)
+                val bitmap = silentCaptureLayer.toImageBitmap()
+                val bytes = bitmap.toByteArray()
+                if (bytes != null) {
+                    shareImage(
+                        bytes = bytes,
+                        fileName = "cartao_pax_${card.idContrato}_${card.nomeCliente.take(5)}",
+                        title = "Compartilhar Cartão Virtual"
+                    )
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                cardToShare = null
+            }
+        }
+    }
 
     LaunchedEffect(idcliente) {
         if (idcliente != 0) {
@@ -79,7 +128,6 @@ fun VirtualCardScreen(
     }
 
     val pagerState = rememberPagerState(pageCount = { cartoesList.size })
-    val scope = rememberCoroutineScope()
 
     Scaffold(
         containerColor = WalletDarkBg,
@@ -161,8 +209,11 @@ fun VirtualCardScreen(
                                 }
                         ) {
                             Box(modifier = Modifier.fillMaxSize()) {
-                                // Design do Cartão com Imagem Local
-                                CardContent(item = item)
+                                // Design do Cartão com Ícone de Compartilhar
+                                CardContent(
+                                    item = item,
+                                    onShareClick = { cardToShare = item }
+                                )
                             }
                         }
                     }
@@ -240,6 +291,28 @@ fun VirtualCardScreen(
                 }
             }
         }
+
+        // Camada de Captura Silenciosa (Invisível)
+        if (cardToShare != null) {
+            Box(
+                modifier = Modifier
+                    .size(width = 400.dp, height = 250.dp)
+                    .graphicsLayer { alpha = 0.01f }
+                    .drawWithContent {
+                        silentCaptureLayer.record {
+                            this@drawWithContent.drawContent()
+                        }
+                        drawLayer(silentCaptureLayer)
+                    }
+            ) {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    CardContent(item = cardToShare!!)
+                }
+            }
+        }
     }
 
     if (showGerarDialog) {
@@ -269,9 +342,10 @@ fun VirtualCardScreen(
 }
 
 @Composable
-fun CardContent(item: CartaoItem) {
+fun CardContent(item: CartaoItem, onShareClick: (() -> Unit)? = null) {
+    val sessionManager = remember { SessionManager() }
     // Verifica se temos um estilo salvo localmente para este ID, senão usa o tipo do backend
-    val style = cardStyleOverrides[item.idControle] ?: item.tipo
+    val style = sessionManager.getCardStyle(item.idControle) ?: item.tipo
     val lowerTipo = style.lowercase()
     val isKids = lowerTipo.contains("kids")
     val isTeen = lowerTipo.contains("teen")
@@ -302,6 +376,27 @@ fun CardContent(item: CartaoItem) {
             contentScale = ContentScale.FillBounds
         )
 
+        // Botão de Compartilhar Rápido (Glassmorphism) - Apenas se onShareClick for passado
+        if (onShareClick != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp)
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.Black.copy(alpha = 0.3f))
+                    .clickable { onShareClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Share,
+                    contentDescription = "Compartilhar",
+                    tint = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -314,8 +409,9 @@ fun CardContent(item: CartaoItem) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom
             ) {
+                val rawName = if (item.dep == "S") item.nomeDependente ?: "" else item.nomeCliente
                 Text(
-                    text = (if (item.dep == "S") item.nomeDependente ?: "" else item.nomeCliente).uppercase(),
+                    text = formatCardName(rawName),
                     color = Color.Black.copy(alpha = 0.85f),
                     fontSize = nomeSize,
                     fontFamily = FontFamily.Monospace,
@@ -363,6 +459,9 @@ fun CardContent(item: CartaoItem) {
 
 @Composable
 fun CardExpansionDialog(item: CartaoItem, onDismiss: () -> Unit) {
+    val graphicsLayer = rememberGraphicsLayer()
+    val scope = rememberCoroutineScope()
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -370,22 +469,34 @@ fun CardExpansionDialog(item: CartaoItem, onDismiss: () -> Unit) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.9f))
-                .clickable { onDismiss() },
+                .background(Color.Black.copy(alpha = 0.9f)),
             contentAlignment = Alignment.Center
         ) {
+            // Overlay clicável apenas no fundo para não interferir nos botões
+            Box(Modifier.fillMaxSize().clickable { onDismiss() })
+
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(24.dp)
             ) {
-                Card(
-                    shape = RoundedCornerShape(20.dp),
-                    elevation = CardDefaults.cardElevation(16.dp),
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1.586f)
+                        .drawWithContent {
+                            graphicsLayer.record {
+                                this@drawWithContent.drawContent()
+                            }
+                            drawLayer(graphicsLayer)
+                        }
                 ) {
-                    CardContent(item = item)
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        elevation = CardDefaults.cardElevation(16.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        CardContent(item = item)
+                    }
                 }
                 
                 Spacer(modifier = Modifier.height(32.dp))
@@ -414,13 +525,89 @@ fun CardExpansionDialog(item: CartaoItem, onDismiss: () -> Unit) {
                 
                 Spacer(modifier = Modifier.height(40.dp))
                 
-                Button(
-                    onClick = onDismiss,
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.width(200.dp).height(50.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("FECHAR", fontWeight = FontWeight.Bold)
+                    // Botão Compartilhar
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    val bitmap = graphicsLayer.toImageBitmap()
+                                    val bytes = bitmap.toByteArray()
+                                    if (bytes != null) {
+                                        shareImage(
+                                            bytes = bytes,
+                                            fileName = "cartao_pax_${item.idContrato}",
+                                            title = "Compartilhar Cartão Virtual"
+                                        )
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Icon(Icons.Default.Share, null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "COMPARTILHAR", 
+                            fontWeight = FontWeight.Bold, 
+                            fontSize = 12.sp,
+                            maxLines = 1
+                        )
+                    }
+
+                    // Botão Baixar
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    val bitmap = graphicsLayer.toImageBitmap()
+                                    val bytes = bitmap.toByteArray()
+                                    if (bytes != null) {
+                                        saveImageToGallery(
+                                            bytes = bytes,
+                                            fileName = "cartao_pax_${item.idContrato}"
+                                        )
+                                    } else {
+                                        // Feedback básico se falhar a conversão
+                                        println("Erro: toByteArray retornou null")
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
+                        },
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.Gray),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Icon(Icons.Default.Download, null, tint = TextWhite, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "BAIXAR", 
+                            color = TextWhite, 
+                            fontWeight = FontWeight.Bold, 
+                            fontSize = 12.sp,
+                            maxLines = 1
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("FECHAR", color = TextGray, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -459,6 +646,8 @@ fun GerarCartaoDialog(
     val calculatedValidity = remember(WalletCache.mensalidadesList.size) {
         WalletCache.getCalculatedValidity("") 
     }
+    
+    val sessionManager = remember { SessionManager() }
 
     Dialog(onDismissRequest = { 
         if (uiState !is VirtualCardState.Loading) {
@@ -628,9 +817,9 @@ fun GerarCartaoDialog(
                         Spacer(modifier = Modifier.height(24.dp))
                         
                         state.newCard?.let { card ->
-                            // Update style override if needed
+                            // Persiste o estilo escolhido localmente
                             LaunchedEffect(card.idControle) {
-                                cardStyleOverrides[card.idControle] = selectedEstilo
+                                sessionManager.saveCardStyle(card.idControle, selectedEstilo)
                             }
                             Card(
                                 shape = RoundedCornerShape(12.dp),

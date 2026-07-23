@@ -6,6 +6,8 @@
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Este aplicativo precisa de acesso à galeria para que você possa escolher uma foto para o perfil do seu pet.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Este aplicativo precisa de permissão para salvar o cartão virtual na sua galeria de fotos.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Este aplicativo precisa de acesso à câmera para que você possa tirar uma foto para o perfil do seu pet.</string>
 </dict>

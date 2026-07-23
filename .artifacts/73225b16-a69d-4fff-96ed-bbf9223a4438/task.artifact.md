@@ -1,6 +1,5 @@
-# Tarefas: Implementação do Parâmetro de Gratuidade
+# Tarefas: Atualização de AGP e Gradle
 
-- [x] Atualizar `ApiService.kt` para aceitar os 5 parâmetros solicitados
-- [x] Atualizar `VirtualCardViewModel.kt` para converter `Boolean` em "S"/"N"
-- [x] Refatorar `VirtualCardScreen.kt` para simplificar a chamada
-- [x] Limpar parâmetros não utilizados
+- [x] Atualizar `gradle/libs.versions.toml` (AGP 9.1.0)
+- [x] Atualizar `gradle/wrapper/gradle-wrapper.properties` (Gradle 9.3.1)
+- [x] Sincronizar e verificar build
