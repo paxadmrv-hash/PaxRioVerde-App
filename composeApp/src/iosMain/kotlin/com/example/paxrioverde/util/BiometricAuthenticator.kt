@@ -2,7 +2,9 @@ package com.example.paxrioverde.util
 
 import platform.LocalAuthentication.*
 import platform.Foundation.*
+import kotlinx.cinterop.ExperimentalForeignApi
 
+@OptIn(ExperimentalForeignApi::class)
 actual class BiometricAuthenticator {
     actual fun canAuthenticate(): Boolean {
         val context = LAContext()
