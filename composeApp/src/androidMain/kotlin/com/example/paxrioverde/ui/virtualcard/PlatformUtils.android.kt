@@ -2,6 +2,7 @@ package com.example.paxrioverde.ui.virtualcard
 
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Base64
 import android.util.Log
@@ -62,5 +63,20 @@ actual fun ImageBitmap.toByteArray(): ByteArray? {
         stream.toByteArray()
     } else {
         null
+    }
+}
+
+actual fun getAppVersionCode(): Int {
+    return try {
+        val context = AndroidContext.get()
+        val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            pInfo.longVersionCode.toInt()
+        } else {
+            @Suppress("DEPRECATION")
+            pInfo.versionCode
+        }
+    } catch (e: Exception) {
+        0
     }
 }

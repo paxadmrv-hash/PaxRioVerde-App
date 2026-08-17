@@ -1,23 +1,31 @@
-# Walkthrough - Abreviação de Nomes no Cartão Virtual
+# Walkthrough - Tela de Novidades ("What's New")
 
-Implementamos uma formatação inteligente para os nomes exibidos nos cartões virtuais, seguindo o padrão profissional de cartões de crédito. Isso evita que nomes longos quebrem o layout ou fiquem ilegíveis.
+Implementamos uma experiência de introdução (onboarding) automática para apresentar as novas funcionalidades do aplicativo de forma elegante e profissional.
 
 ## Mudanças Realizadas
 
-### 1. Lógica de Abreviação de Nomes
-*   Adicionamos a função `formatCardName` em `VirtualCardScreen.kt`.
-*   **Como funciona**:
-    *   O primeiro nome e o último sobrenome são mantidos completos.
-    *   Nomes intermediários são abreviados para a primeira letra (ex: "Roberto" -> "R.").
-    *   Preposições comuns como "da", "de", "do", "dos" são mantidas para preservar a naturalidade do nome.
-    *   **Exemplo**: "MARIA DA SILVA SANTOS" vira "MARIA DA S. SANTOS".
+### 1. Novo Componente de Onboarding (`WhatsNewModal`)
+*   **Design**: Um modal em tela cheia com um carrossel horizontal intuitivo.
+*   **Conteúdo**: 3 slides focados nas grandes novidades:
+    1.  **Compartilhamento**: Instruções sobre o novo botão de envio.
+    2.  **Galeria**: Destaque para a função de baixar o cartão.
+    3.  **Estilos**: Apresentação dos temas Adulto, Teen e Kids.
+*   **Tecnologia**: Utiliza `HorizontalPager` do Compose para uma navegação fluida entre os slides.
 
-### 2. Aplicação Visual
-*   A abreviação é aplicada apenas no texto que aparece **dentro do cartão**.
-*   O nome completo continua sendo exibido nos detalhes (abaixo do cartão) para que o usuário possa conferir a grafia exata se necessário.
+### 2. Gatilho de Versão Inteligente
+*   O aplicativo agora monitora o `versionCode` interno.
+*   **Lógica**: Sempre que o usuário abre o Dashboard, o app verifica: *"Esta versão é mais recente do que a última que o usuário viu?"*.
+*   Se sim, o modal abre automaticamente. Ao clicar em "Começar", o app registra que aquela versão foi vista e não mostrará o modal novamente até a próxima atualização.
 
-## Resultado
-Os cartões agora possuem um visual muito mais limpo e profissional, garantindo que o nome sempre caiba perfeitamente no espaço designado, independentemente de quão longo ele seja.
+### 3. Persistência de Dados
+*   Utilizamos o `SessionManager` para gravar permanentemente o status de visualização, garantindo que o modal não se torne repetitivo para o usuário.
+
+## Como Testar
+1.  Abra o aplicativo e faça login.
+2.  A tela "O que há de novo?" deve aparecer automaticamente.
+3.  Deslize pelos slides ou use o botão "Próximo".
+4.  No último slide, clique em "Começar".
+5.  Feche o app e abra novamente: o Dashboard deve carregar direto, sem o modal.
 
 > [!TIP]
-> Esta técnica é amplamente utilizada por bancos e administradoras de cartões para garantir a estética e a padronização visual dos seus produtos.
+> Por enquanto, estamos usando as imagens dos cartões reais como "lugar marcado" (placeholders). Quando você tiver as artes finais de marketing, basta substituir os arquivos na pasta `drawable` para atualizar o visual da tela.

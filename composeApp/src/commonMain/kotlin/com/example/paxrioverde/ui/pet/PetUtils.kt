@@ -12,11 +12,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.paxrioverde.ui.theme.PaxDesignSystem
 import kotlinx.datetime.*
 
 @Composable
 fun SpeciesOption(text: String, isSelected: Boolean) {
-    val bgColor = if (isSelected) BrandGreen else Color.Transparent
+    val bgColor = if (isSelected) PaxDesignSystem.Colors.BrandGreen else Color.Transparent
     val textColor = if (isSelected) Color.White else Color.Gray
 
     Box(
@@ -88,3 +89,8 @@ fun getAgeFromDate(birthDate: String): Pair<Int, Int> {
  * Converte ByteArray para String Base64 (Multiplatform)
  */
 expect fun ByteArray.toBase64(): String
+
+/**
+ * Senior Note: Comprime e redimensiona a imagem para economia de RAM e Armazenamento.
+ */
+expect fun compressImage(bytes: ByteArray, maxWidth: Int = 1024, maxHeight: Int = 1024): ByteArray

@@ -27,12 +27,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import org.koin.compose.viewmodel.koinViewModel
 import com.example.paxrioverde.api.ApiService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -42,90 +46,15 @@ import paxrioverde.composeapp.generated.resources.bg_login_family
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
-fun ForgotPasswordScreen(onBack: () -> Unit) {
-    val scope = rememberCoroutineScope()
+fun ForgotPasswordScreen(
+    onBack: () -> Unit,
+    viewModel: ForgotPasswordViewModel = koinViewModel()
+) {
+    val uiState = viewModel.uiState
     val focusManager = LocalFocusManager.current
-
-    var step by remember { mutableStateOf(1) } // 1: Request Token, 2: Reset Password
-    
-    var cpfOrEmail by remember { mutableStateOf("") }
-    var token by remember { mutableStateOf("") }
-    var newPassword by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
-    
-    var passwordVisible by remember { mutableStateOf(false) }
-    var confirmPasswordVisible by remember { mutableStateOf(false) }
-    
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var successMessage by remember { mutableStateOf<String?>(null) }
+    val fontScale = LocalDensity.current.fontScale
 
     val brandGreen = Color(0xFF386641)
-
-    fun handleRequestToken() {
-        if (cpfOrEmail.isEmpty()) {
-            errorMessage = "Informe seu CPF ou E-mail"
-            return
-        }
-        
-        isLoading = true
-        errorMessage = null
-        scope.launch {
-            try {
-                val response = ApiService.esquecerSenha(cpfOrEmail)
-                if (response.success) {
-                    successMessage = response.message ?: "Código enviado com sucesso!"
-                    delay(1500)
-                    successMessage = null
-                    step = 2
-                } else {
-                    errorMessage = response.message ?: "Erro ao solicitar recuperação"
-                }
-            } catch (e: Exception) {
-                errorMessage = "Erro de conexão: ${e.message}"
-            } finally {
-                isLoading = false
-            }
-        }
-    }
-
-    fun handleResetPassword() {
-        if (token.length != 6) {
-            errorMessage = "O código deve ter 6 dígitos"
-            return
-        }
-        if (newPassword.length < 6) {
-            errorMessage = "A senha deve ter pelo menos 6 caracteres"
-            return
-        }
-        if (newPassword != confirmPassword) {
-            errorMessage = "As senhas não coincidem"
-            return
-        }
-
-        isLoading = true
-        errorMessage = null
-        scope.launch {
-            try {
-                val response = ApiService.redefinirSenha(
-                    cpfOrEmail = cpfOrEmail,
-                    token = token,
-                    senha = newPassword
-                )
-                if (response.success) {
-                    successMessage = "Senha redefinida com sucesso!"
-                    delay(2000)
-                    onBack()
-                } else {
-                    errorMessage = response.message ?: "Erro ao redefinir senha"
-                }
-            } catch (e: Exception) {
-                errorMessage = "Erro de conexão: ${e.message}"
-            } finally {
-                isLoading = false
-            }
-        }
-    }
 
     Box(
         modifier = Modifier
@@ -147,6 +76,7 @@ fun ForgotPasswordScreen(onBack: () -> Unit) {
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
+                .imePadding()
         ) {
             Row(
                 modifier = Modifier
@@ -177,23 +107,23 @@ fun ForgotPasswordScreen(onBack: () -> Unit) {
             ) {
                 Column(
                     modifier = Modifier
-                        .padding(horizontal = 32.dp, vertical = 24.dp)
+                        .padding(horizontal = 32.dp, vertical = if (fontScale > 1.3) 16.dp else 24.dp)
                         .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Indicador de progresso (Steps)
                     Row(
-                        modifier = Modifier.padding(bottom = 24.dp),
+                        modifier = Modifier.padding(bottom = if (fontScale > 1.3) 12.dp else 24.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        StepIndicator(isActive = step >= 1, color = brandGreen)
-                        Box(modifier = Modifier.width(40.dp).height(2.dp).background(if (step >= 2) brandGreen else Color.LightGray))
-                        StepIndicator(isActive = step >= 2, color = brandGreen)
+                        StepIndicator(isActive = uiState.step >= 1, color = brandGreen)
+                        Box(modifier = Modifier.width(40.dp).height(2.dp).background(if (uiState.step >= 2) brandGreen else Color.LightGray))
+                        StepIndicator(isActive = uiState.step >= 2, color = brandGreen)
                     }
 
                     AnimatedContent(
-                        targetState = step,
+                        targetState = uiState.step,
                         transitionSpec = {
                             if (targetState > initialState) {
                                 (slideInHorizontally { width -> width } + fadeIn()).togetherWith(
@@ -209,10 +139,12 @@ fun ForgotPasswordScreen(onBack: () -> Unit) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = if (currentStep == 1) "Esqueci minha senha" else "Nova Senha",
-                                fontSize = 28.sp,
+                                fontSize = if (fontScale > 1.3) 22.sp else 28.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = brandGreen,
-                                textAlign = TextAlign.Center
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             
                             Text(
@@ -221,23 +153,23 @@ fun ForgotPasswordScreen(onBack: () -> Unit) {
                                     else "Enviamos um código para seu e-mail. Digite-o abaixo junto com sua nova senha.",
                                 fontSize = 15.sp,
                                 color = Color.Gray,
-                                modifier = Modifier.padding(top = 12.dp, bottom = 32.dp),
+                                modifier = Modifier.padding(top = 8.dp, bottom = if (fontScale > 1.3) 16.dp else 32.dp),
                                 textAlign = TextAlign.Center,
                                 lineHeight = 20.sp
                             )
 
                             if (currentStep == 1) {
                                 LoginTextField(
-                                    value = cpfOrEmail,
-                                    onValueChange = { cpfOrEmail = it },
+                                    value = uiState.cpfOrEmail,
+                                    onValueChange = { viewModel.onCpfOrEmailChange(it) },
                                     label = "CPF ou E-mail",
                                     icon = Icons.Outlined.Person,
                                     keyboardType = KeyboardType.Text
                                 )
                             } else {
                                 LoginTextField(
-                                    value = token,
-                                    onValueChange = { if (it.length <= 6) token = it.filter { c -> c.isDigit() } },
+                                    value = uiState.token,
+                                    onValueChange = { viewModel.onTokenChange(it) },
                                     label = "Código de 6 dígitos",
                                     icon = Icons.Default.Key,
                                     keyboardType = KeyboardType.Number
@@ -246,40 +178,40 @@ fun ForgotPasswordScreen(onBack: () -> Unit) {
                                 Spacer(modifier = Modifier.height(20.dp))
 
                                 LoginTextField(
-                                    value = newPassword,
-                                    onValueChange = { newPassword = it },
+                                    value = uiState.newPassword,
+                                    onValueChange = { viewModel.onNewPasswordChange(it) },
                                     label = "Nova Senha",
                                     icon = Icons.Outlined.Lock,
                                     keyboardType = KeyboardType.Password,
                                     isPassword = true,
-                                    isPasswordVisible = passwordVisible,
-                                    onVisibilityChange = { passwordVisible = !passwordVisible }
+                                    isPasswordVisible = uiState.passwordVisible,
+                                    onVisibilityChange = { viewModel.togglePasswordVisibility() }
                                 )
 
                                 Spacer(modifier = Modifier.height(20.dp))
 
                                 LoginTextField(
-                                    value = confirmPassword,
-                                    onValueChange = { confirmPassword = it },
+                                    value = uiState.confirmPassword,
+                                    onValueChange = { viewModel.onConfirmPasswordChange(it) },
                                     label = "Confirmar Nova Senha",
                                     icon = Icons.Default.LockReset,
                                     keyboardType = KeyboardType.Password,
                                     isPassword = true,
-                                    isPasswordVisible = confirmPasswordVisible,
-                                    onVisibilityChange = { confirmPasswordVisible = !confirmPasswordVisible }
+                                    isPasswordVisible = uiState.confirmPasswordVisible,
+                                    onVisibilityChange = { viewModel.toggleConfirmPasswordVisibility() }
                                 )
                             }
                         }
                     }
 
-                    if (errorMessage != null) {
+                    if (uiState.errorMessage != null) {
                         Surface(
                             color = Color(0xFFFFEBEE),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.padding(top = 16.dp).fillMaxWidth()
                         ) {
                             Text(
-                                errorMessage!!, 
+                                uiState.errorMessage, 
                                 color = Color.Red, 
                                 fontSize = 13.sp, 
                                 modifier = Modifier.padding(12.dp),
@@ -288,14 +220,14 @@ fun ForgotPasswordScreen(onBack: () -> Unit) {
                         }
                     }
                     
-                    if (successMessage != null) {
+                    if (uiState.successMessage != null) {
                         Surface(
                             color = brandGreen.copy(alpha = 0.1f),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.padding(top = 16.dp).fillMaxWidth()
                         ) {
                             Text(
-                                successMessage!!, 
+                                uiState.successMessage, 
                                 color = brandGreen, 
                                 fontSize = 13.sp, 
                                 modifier = Modifier.padding(12.dp),
@@ -304,21 +236,21 @@ fun ForgotPasswordScreen(onBack: () -> Unit) {
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(40.dp))
+                    Spacer(modifier = Modifier.height(if (fontScale > 1.3) 20.dp else 40.dp))
 
                     Button(
-                        onClick = { if (step == 1) handleRequestToken() else handleResetPassword() },
-                        modifier = Modifier.fillMaxWidth().height(60.dp),
+                        onClick = { if (uiState.step == 1) viewModel.handleRequestToken() else viewModel.handleResetPassword(onBack) },
+                        modifier = Modifier.fillMaxWidth().height(if (fontScale > 1.3) 50.dp else 60.dp),
                         shape = RoundedCornerShape(20.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = brandGreen),
-                        enabled = !isLoading,
+                        enabled = !uiState.isLoading,
                         elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
                     ) {
-                        if (isLoading) {
+                        if (uiState.isLoading) {
                             CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                         } else {
                             Text(
-                                if (step == 1) "ENVIAR CÓDIGO" else "REDEFINIR SENHA",
+                                if (uiState.step == 1) "ENVIAR CÓDIGO" else "REDEFINIR SENHA",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp,
                                 letterSpacing = 1.2.sp
@@ -326,9 +258,9 @@ fun ForgotPasswordScreen(onBack: () -> Unit) {
                         }
                     }
 
-                    if (step == 2) {
+                    if (uiState.step == 2) {
                         TextButton(
-                            onClick = { step = 1 },
+                            onClick = { viewModel.setStep(1) },
                             modifier = Modifier.padding(top = 16.dp)
                         ) {
                             Text("Voltar para a página anterior", color = brandGreen, fontWeight = FontWeight.Medium)

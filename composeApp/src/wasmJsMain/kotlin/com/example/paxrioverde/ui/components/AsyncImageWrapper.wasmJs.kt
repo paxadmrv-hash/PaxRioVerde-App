@@ -1,4 +1,4 @@
-package com.example.paxrioverde.ui.pet
+package com.example.paxrioverde.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable

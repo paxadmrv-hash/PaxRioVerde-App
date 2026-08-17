@@ -1,8 +1,11 @@
 package com.example.paxrioverde.ui.virtualcard
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -19,6 +23,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
@@ -27,13 +33,21 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.paxrioverde.ui.components.shimmerEffect
+import org.koin.compose.koinInject
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.compose.viewmodel.koinViewModel
 import com.example.paxrioverde.api.*
+import com.example.paxrioverde.ui.components.PaxPageIndicator
+import com.example.paxrioverde.ui.components.PaxScreenHeader
+import com.example.paxrioverde.ui.theme.PaxDesignSystem
 import com.example.paxrioverde.util.*
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
@@ -41,9 +55,10 @@ import org.jetbrains.compose.resources.painterResource
 import paxrioverde.composeapp.generated.resources.Res
 import paxrioverde.composeapp.generated.resources.*
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
-val WalletDarkBg = Color(0xFF13211c)
-val BrandLightGreen = Color(0xFF6fad2b)
+val WalletDarkBg = Color(0xFF13211C)
 val WalletCardBg = Color(0xFF1E1E1E)
 val TextWhite = Color(0xFFE3E3E3)
 val TextGray = Color(0xFF8E8E93)
@@ -83,14 +98,29 @@ fun VirtualCardScreen(
     idfilial: Int = 0,
     dtvencimento: String = "",
     valorCartao: String? = null,
+    isDependent: Boolean = false,
+    userName: String? = null,
     onCardGenerated: () -> Unit = {},
     onNavigateToFinance: () -> Unit = {},
-    viewModel: VirtualCardViewModel = viewModel { VirtualCardViewModel() }
+    viewModel: VirtualCardViewModel = koinViewModel()
 ) {
-    val cartoesList = WalletCache.cartoesList
-    val isPreloading = WalletCache.isPreloading
+    val walletCache: WalletCache = koinInject()
+    val cartoesList = walletCache.cartoesList
+    val isPreloading = walletCache.isPreloading
+    val fontScale = LocalDensity.current.fontScale
+
+    val filteredCartoes = remember(cartoesList, isDependent, userName) {
+        if (isDependent && userName != null) {
+            cartoesList.filter { 
+                it.nomeDependente?.trim()?.equals(userName.trim(), ignoreCase = true) == true ||
+                it.nomeCliente.trim().equals(userName.trim(), ignoreCase = true)
+            }
+        } else {
+            cartoesList
+        }
+    }
     
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     var showGerarDialog by remember { mutableStateOf(false) }
     var expandedCard by remember { mutableStateOf<CartaoItem?>(null) }
@@ -114,7 +144,7 @@ fun VirtualCardScreen(
                     )
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                com.example.paxrioverde.util.PaxLogger.e("Erro na captura de imagem", e, "VirtualCard")
             } finally {
                 cardToShare = null
             }
@@ -123,26 +153,39 @@ fun VirtualCardScreen(
 
     LaunchedEffect(idcliente) {
         if (idcliente != 0) {
-            WalletCache.preLoad(idcliente)
+            walletCache.preLoad(idcliente)
         }
     }
 
-    val pagerState = rememberPagerState(pageCount = { cartoesList.size })
+    // Senior Note: Limpeza de memória ao sair da tela.
+    // Evita que Bitmaps pesados fiquem presos no Singleton WalletCache.
+    DisposableEffect(Unit) {
+        onDispose {
+            walletCache.clearBitmaps()
+        }
+    }
+
+    val pagerState = rememberPagerState(pageCount = { filteredCartoes.size })
 
     Scaffold(
         containerColor = WalletDarkBg,
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 40.dp, start = 16.dp, end = 16.dp, bottom = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // Senior: Header minimalista que se funde ao fundo dark da carteira
+            PaxScreenHeader(
+                onBackClick = onBack,
+                backgroundBrush = Brush.verticalGradient(
+                    listOf(WalletDarkBg, WalletDarkBg.copy(alpha = 0.8f))
+                )
             ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar", tint = TextWhite)
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Carteira", fontSize = 24.sp, color = TextWhite)
+                Text(
+                    text = "Carteira",
+                    fontSize = if (fontScale > 1.3) 22.sp else 28.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = TextWhite,
+                    letterSpacing = (-0.5).sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     ) { paddingValues ->
@@ -155,32 +198,36 @@ fun VirtualCardScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.45f)
-                    .padding(vertical = 16.dp),
+                    .heightIn(min = if (fontScale > 1.3) 240.dp else 280.dp)
+                    .fillMaxHeight(if (fontScale > 1.3) 0.55f else 0.45f)
+                    .padding(vertical = if (fontScale > 1.3) 8.dp else 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
                     text = "SEUS CARTÕES",
                     color = TextWhite,
-                    fontSize = 18.sp,
+                    fontSize = if (fontScale > 1.3) 14.sp else 18.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
                 )
                 Text(
                     text = "Deslize para ver todos os seus cartões",
                     color = TextGray,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(bottom = 12.dp)
+                    fontSize = if (fontScale > 1.3) 10.sp else 12.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
 
-                if (isPreloading && cartoesList.isEmpty()) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = BrandLightGreen)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("Buscando cartões...", color = TextWhite, fontSize = 14.sp)
-                    }
-                } else if (cartoesList.isEmpty()) {
+                if (isPreloading && filteredCartoes.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 48.dp)
+                            .aspectRatio(1.586f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .shimmerEffect()
+                    )
+                } else if (filteredCartoes.isEmpty()) {
                     Text("Nenhum cartão ativo.", color = TextGray)
                 } else {
                     HorizontalPager(
@@ -189,27 +236,44 @@ fun VirtualCardScreen(
                         pageSpacing = 16.dp,
                         modifier = Modifier.fillMaxWidth()
                     ) { page ->
-                        val item = cartoesList[page]
-                        val pageOffset = (
-                                (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
-                                ).absoluteValue
+                        val item = filteredCartoes[page]
 
                         Card(
-                            shape = RoundedCornerShape(16.dp),
+                            shape = RoundedCornerShape(20.dp),
                             elevation = CardDefaults.cardElevation(12.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .aspectRatio(1.586f)
                                 .clickable { expandedCard = item }
                                 .graphicsLayer {
-                                    val scale = lerp(1f, 0.85f, pageOffset.coerceIn(0f, 1f))
+                                    val pageOffset = (
+                                        (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+                                    )
+                                    
+                                    // Efeito 3D: Rotação no eixo Y
+                                    rotationY = pageOffset * 25f
+                                    
+                                    // Escala dinâmica
+                                    val scale = lerp(
+                                        start = 1f,
+                                        stop = 0.85f,
+                                        fraction = pageOffset.absoluteValue.coerceIn(0f, 1f)
+                                    )
                                     scaleX = scale
                                     scaleY = scale
-                                    alpha = lerp(1f, 0.5f, pageOffset.coerceIn(0f, 1f))
+                                    
+                                    // Transparência para cartões distantes
+                                    alpha = lerp(
+                                        start = 1f,
+                                        stop = 0.6f,
+                                        fraction = pageOffset.absoluteValue.coerceIn(0f, 1f)
+                                    )
+                                    
+                                    // Profundidade da câmera (essencial para o efeito 3D)
+                                    cameraDistance = 8 * density
                                 }
                         ) {
                             Box(modifier = Modifier.fillMaxSize()) {
-                                // Design do Cartão com Ícone de Compartilhar
                                 CardContent(
                                     item = item,
                                     onShareClick = { cardToShare = item }
@@ -218,28 +282,10 @@ fun VirtualCardScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    // Indicadores (Dots) estilo o anexo
-                    Row(
-                        modifier = Modifier.height(8.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        repeat(cartoesList.size) { iteration ->
-                            val isSelected = pagerState.currentPage == iteration
-                            val color = if (isSelected) BrandLightGreen else Color.DarkGray
-                            val size = if (isSelected) 8.dp else 6.dp
-                            
-                            Box(
-                                modifier = Modifier
-                                    .padding(horizontal = 4.dp)
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(color)
-                                    .size(size)
-                            )
-                        }
-                    }
+                    // Novo Indicador Animado Senior
+                    PaxPageIndicator(pagerState = pagerState)
                 }
             }
 
@@ -248,23 +294,25 @@ fun VirtualCardScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                    .clip(RoundedCornerShape(24.dp, 24.dp))
                     .background(WalletCardBg)
                     .navigationBarsPadding()
                     .padding(24.dp)
             ) {
-                Button(
-                    onClick = { showGerarDialog = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp)
-                        .height(50.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Default.Add, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Gerar Novo Cartão", fontWeight = FontWeight.Bold)
+                if (!isDependent) {
+                    Button(
+                        onClick = { showGerarDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                            .height(50.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PaxDesignSystem.Colors.BrandLightGreen),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Add, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Gerar Novo Cartão", fontWeight = FontWeight.Bold)
+                    }
                 }
 
                 Text(
@@ -279,13 +327,20 @@ fun VirtualCardScreen(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    itemsIndexed(cartoesList) { index, card ->
-                        Box(modifier = Modifier.clickable {
-                            scope.launch {
-                                pagerState.animateScrollToPage(index)
+                    itemsIndexed(filteredCartoes) { index, card ->
+                        // Animação de entrada em cascata
+                        AnimatedVisibility(
+                            visible = true,
+                            enter = fadeIn(animationSpec = tween(durationMillis = 500, delayMillis = index * 100)) +
+                                    slideInVertically(animationSpec = tween(durationMillis = 500, delayMillis = index * 100)) { it / 2 }
+                        ) {
+                            Box(modifier = Modifier.clickable {
+                                scope.launch {
+                                    pagerState.animateScrollToPage(index)
+                                }
+                            }) {
+                                ActiveCardRow(item = card)
                             }
-                        }) {
-                            ActiveCardRow(item = card)
                         }
                     }
                 }
@@ -343,6 +398,7 @@ fun VirtualCardScreen(
 
 @Composable
 fun CardContent(item: CartaoItem, onShareClick: (() -> Unit)? = null) {
+    val walletCache: WalletCache = koinInject()
     val sessionManager = remember { SessionManager() }
     // Verifica se temos um estilo salvo localmente para este ID, senão usa o tipo do backend
     val style = sessionManager.getCardStyle(item.idControle) ?: item.tipo
@@ -351,7 +407,7 @@ fun CardContent(item: CartaoItem, onShareClick: (() -> Unit)? = null) {
     val isTeen = lowerTipo.contains("teen")
 
     val parentesco = if (item.dep == "S") {
-        WalletCache.dependentesList.find { it.nomeDependente == item.nomeDependente }?.parentesco ?: "DEPENDENTE"
+        walletCache.dependentesList.find { it.nomeDependente == item.nomeDependente }?.parentesco ?: "DEPENDENTE"
     } else {
         "TITULAR"
     }
@@ -363,10 +419,13 @@ fun CardContent(item: CartaoItem, onShareClick: (() -> Unit)? = null) {
     }
 
     // Valores otimizados para descer as informações e liberar o fundo
+    val fontScale = LocalDensity.current.fontScale
     val paddingHoriz = if (isKids) 32.dp else 26.dp
     val paddingVert = if (isKids) 12.dp else 10.dp
-    val nomeSize = if (isKids) 11.sp else 13.sp
-    val infoSize = if (isKids) 9.sp else 11.sp
+    
+    // Limitamos o crescimento da fonte dentro do cartão para não quebrar a arte
+    val nomeSize = (if (isKids) 11.sp else 13.sp) * (if (fontScale > 1.2) 1.1f else 1f)
+    val infoSize = (if (isKids) 9.sp else 11.sp) * (if (fontScale > 1.2) 1.1f else 1f)
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
@@ -517,7 +576,7 @@ fun CardExpansionDialog(item: CartaoItem, onDismiss: () -> Unit) {
                 // Validade destacada abaixo do nome
                 Text(
                     text = "VALIDADE: ${item.dtValidade}",
-                    color = BrandLightGreen,
+                    color = PaxDesignSystem.Colors.BrandLightGreen,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace
@@ -544,11 +603,11 @@ fun CardExpansionDialog(item: CartaoItem, onDismiss: () -> Unit) {
                                         )
                                     }
                                 } catch (e: Exception) {
-                                    e.printStackTrace()
+                                    com.example.paxrioverde.util.PaxLogger.e("Erro na operação de imagem", e, "VirtualCard")
                                 }
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen),
+                        colors = ButtonDefaults.buttonColors(containerColor = PaxDesignSystem.Colors.BrandLightGreen),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.weight(1f).height(50.dp),
                         contentPadding = PaddingValues(horizontal = 8.dp)
@@ -576,11 +635,10 @@ fun CardExpansionDialog(item: CartaoItem, onDismiss: () -> Unit) {
                                             fileName = "cartao_pax_${item.idContrato}"
                                         )
                                     } else {
-                                        // Feedback básico se falhar a conversão
-                                        println("Erro: toByteArray retornou null")
+                                        com.example.paxrioverde.util.PaxLogger.e("Erro: toByteArray retornou null", subTag = "VirtualCard")
                                     }
                                 } catch (e: Exception) {
-                                    e.printStackTrace()
+                                    com.example.paxrioverde.util.PaxLogger.e("Erro ao baixar", e, "VirtualCard")
                                 }
                             }
                         },
@@ -628,10 +686,11 @@ fun GerarCartaoDialog(
     onNavigateToFinance: () -> Unit = {},
     viewModel: VirtualCardViewModel
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val walletCache: WalletCache = koinInject()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     
     var isTitular by remember { mutableStateOf(true) }
-    val dependentesList = WalletCache.dependentesList
+    val dependentesList = walletCache.dependentesList
     var selectedDependente by remember { mutableStateOf<DependenteItem?>(null) }
     var expanded by remember { mutableStateOf(false) }
     
@@ -640,11 +699,12 @@ fun GerarCartaoDialog(
     var expandedEstilo by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
+    @Suppress("DEPRECATION")
     val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
 
     // Calcula a nova validade baseada na fidelidade (WalletCache)
-    val calculatedValidity = remember(WalletCache.mensalidadesList.size) {
-        WalletCache.getCalculatedValidity("") 
+    val calculatedValidity = remember(walletCache.mensalidadesList.size) {
+        walletCache.getCalculatedValidity("") 
     }
     
     val sessionManager = remember { SessionManager() }
@@ -665,11 +725,11 @@ fun GerarCartaoDialog(
             ) {
                 when (val state = uiState) {
                     is VirtualCardState.Idle -> {
-                        Text("Gerar Novo Cartão", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = BrandLightGreen, modifier = Modifier.padding(bottom = 16.dp))
+                        Text("Gerar Novo Cartão", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = PaxDesignSystem.Colors.BrandLightGreen, modifier = Modifier.padding(bottom = 16.dp))
 
                         if (calculatedValidity.isNotEmpty()) {
                             Surface(
-                                color = BrandLightGreen.copy(alpha = 0.1f),
+                                color = PaxDesignSystem.Colors.BrandLightGreen.copy(alpha = 0.1f),
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
                             ) {
@@ -677,7 +737,7 @@ fun GerarCartaoDialog(
                                     modifier = Modifier.padding(12.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Info, null, tint = BrandLightGreen, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.Info, null, tint = PaxDesignSystem.Colors.BrandLightGreen, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = "Seu novo cartão será válido até: $calculatedValidity",
@@ -690,11 +750,11 @@ fun GerarCartaoDialog(
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { isTitular = true }) {
-                            RadioButton(selected = isTitular, onClick = { isTitular = true }, colors = RadioButtonDefaults.colors(selectedColor = BrandLightGreen))
+                            RadioButton(selected = isTitular, onClick = { isTitular = true }, colors = RadioButtonDefaults.colors(selectedColor = PaxDesignSystem.Colors.BrandLightGreen))
                             Text("Titular", color = Color.Black)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { isTitular = false }) {
-                            RadioButton(selected = !isTitular, onClick = { isTitular = false }, colors = RadioButtonDefaults.colors(selectedColor = BrandLightGreen))
+                            RadioButton(selected = !isTitular, onClick = { isTitular = false }, colors = RadioButtonDefaults.colors(selectedColor = PaxDesignSystem.Colors.BrandLightGreen))
                             Text("Dependente", color = Color.Black)
                         }
 
@@ -708,8 +768,8 @@ fun GerarCartaoDialog(
                                     onValueChange = {},
                                     readOnly = true,
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedEstilo) },
-                                    modifier = Modifier.menuAnchor().fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = BrandLightGreen, unfocusedBorderColor = Color.LightGray, focusedTextColor = Color.Black, unfocusedTextColor = Color.Black)
+                                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PaxDesignSystem.Colors.BrandLightGreen, unfocusedBorderColor = Color.LightGray, focusedTextColor = Color.Black, unfocusedTextColor = Color.Black)
                                 )
                                 ExposedDropdownMenu(expanded = expandedEstilo, onDismissRequest = { expandedEstilo = false }, modifier = Modifier.background(Color.White)) {
                                     estilos.forEach { estilo ->
@@ -728,8 +788,8 @@ fun GerarCartaoDialog(
                                     onValueChange = {},
                                     readOnly = true,
                                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                                    modifier = Modifier.menuAnchor().fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = BrandLightGreen, unfocusedBorderColor = Color.LightGray, focusedTextColor = Color.Black, unfocusedTextColor = Color.Black)
+                                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+                                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PaxDesignSystem.Colors.BrandLightGreen, unfocusedBorderColor = Color.LightGray, focusedTextColor = Color.Black, unfocusedTextColor = Color.Black)
                                 )
                                 ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.background(Color.White)) {
                                     dependentesList.forEach { dep ->
@@ -766,7 +826,7 @@ fun GerarCartaoDialog(
                                 }
                             },
                             modifier = Modifier.fillMaxWidth().height(50.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen),
+                            colors = ButtonDefaults.buttonColors(containerColor = PaxDesignSystem.Colors.BrandLightGreen),
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Text("GERAR CARTÃO AGORA", color = Color.White, fontWeight = FontWeight.Bold)
@@ -775,13 +835,13 @@ fun GerarCartaoDialog(
                     }
 
                     is VirtualCardState.Loading -> {
-                        CircularProgressIndicator(color = BrandLightGreen)
+                        CircularProgressIndicator(color = PaxDesignSystem.Colors.BrandLightGreen)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("Processando...", color = Color.Black)
                     }
 
                     is VirtualCardState.PixGenerated -> {
-                        Text("Pagamento PIX", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = BrandLightGreen)
+                        Text("Pagamento PIX", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = PaxDesignSystem.Colors.BrandLightGreen)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("Copie o código abaixo e pague no seu banco:", textAlign = TextAlign.Center, color = Color.Black)
                         Spacer(modifier = Modifier.height(16.dp))
@@ -799,20 +859,20 @@ fun GerarCartaoDialog(
                                 clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(state.pixCode))
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen)
+                            colors = ButtonDefaults.buttonColors(containerColor = PaxDesignSystem.Colors.BrandLightGreen)
                         ) {
                             Text("COPIAR CÓDIGO")
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("Aguardando pagamento...", color = Color.Gray, fontSize = 12.sp)
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp), color = BrandLightGreen)
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp), color = PaxDesignSystem.Colors.BrandLightGreen)
                         TextButton(onClick = onDismiss) { Text("Cancelar", color = Color.Red) }
                     }
 
                     is VirtualCardState.Success -> {
-                        Icon(Icons.Default.CheckCircle, null, tint = BrandLightGreen, modifier = Modifier.size(64.dp))
+                        Icon(Icons.Default.CheckCircle, null, tint = PaxDesignSystem.Colors.BrandLightGreen, modifier = Modifier.size(64.dp))
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("Sucesso!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = BrandLightGreen)
+                        Text("Sucesso!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = PaxDesignSystem.Colors.BrandLightGreen)
                         Text("Cartão gerado com sucesso.", color = Color.Black)
                         Spacer(modifier = Modifier.height(24.dp))
                         
@@ -836,7 +896,7 @@ fun GerarCartaoDialog(
                                 onSuccess()
                             },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen)
+                            colors = ButtonDefaults.buttonColors(containerColor = PaxDesignSystem.Colors.BrandLightGreen)
                         ) {
                             Text("OK")
                         }
@@ -851,7 +911,7 @@ fun GerarCartaoDialog(
                         Button(
                             onClick = { viewModel.resetState() },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = BrandLightGreen)
+                            colors = ButtonDefaults.buttonColors(containerColor = PaxDesignSystem.Colors.BrandLightGreen)
                         ) {
                             Text("TENTAR NOVAMENTE")
                         }
@@ -867,36 +927,79 @@ fun GerarCartaoDialog(
 fun ActiveCardRow(item: CartaoItem) {
     val isExpired = isCardExpired(item.dtValidade)
 
+    // Glassmorphism: Fundo semi-transparente com borda sutil e brilhante
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.Black.copy(alpha = 0.3f))
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.05f)) // Camada de "vidro"
+            .border(
+                width = 0.5.dp,
+                brush = Brush.linearGradient(
+                    listOf(
+                        Color.White.copy(alpha = 0.2f),
+                        Color.Transparent
+                    )
+                ),
+                shape = RoundedCornerShape(16.dp)
+            )
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = if (isExpired) Icons.Default.Warning else Icons.Default.CreditCard,
-                contentDescription = null,
-                tint = if (isExpired) ExpiredRed else BrandLightGreen,
-                modifier = Modifier.size(24.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isExpired) PaxDesignSystem.Colors.Error.copy(alpha = 0.1f) 
+                        else PaxDesignSystem.Colors.BrandLightGreen.copy(alpha = 0.1f)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isExpired) Icons.Default.Warning else Icons.Default.CreditCard,
+                    contentDescription = null,
+                    tint = if (isExpired) ExpiredRed else PaxDesignSystem.Colors.BrandLightGreen,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            
             Spacer(modifier = Modifier.width(16.dp))
 
-            Column {
-                Text(if (item.dep == "S") item.nomeDependente ?: "" else item.nomeCliente, color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text("Estilo: ${item.tipo}", color = TextGray, fontSize = 12.sp)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (item.dep == "S") item.nomeDependente ?: "" else item.nomeCliente, 
+                    color = TextWhite, 
+                    fontWeight = FontWeight.Bold, 
+                    fontSize = 15.sp,
+                    maxLines = 2, // Senior UX: Permite 2 linhas para evitar cortes
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = "Estilo: ${item.tipo}", 
+                    color = TextGray, 
+                    fontSize = 12.sp,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
 
+        Spacer(modifier = Modifier.width(8.dp))
+
         Column(horizontalAlignment = Alignment.End) {
-            Text("Validade", color = TextGray, fontSize = 10.sp)
+            Text(
+                text = "VALIDADE", 
+                color = TextGray, 
+                fontSize = 9.sp, 
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
             Text(
                 text = item.dtValidade,
                 color = if (isExpired) ExpiredRed else TextWhite,
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 13.sp
             )
         }
     }

@@ -12,3 +12,6 @@
 - [x] Adicionar botão de baixar e corrigir quebra de texto em `VirtualCardScreen.kt`
 - [x] Implementar `formatCardName` em `VirtualCardScreen.kt`
 - [x] Aplicar abreviação de nome no `CardContent`
+- [x] Criar componente `WhatsNewModal.kt` (Onboarding)
+- [x] Integrar `WhatsNewModal` no `DashboardScreen`
+- [x] Validar lógica de exibição única por versão

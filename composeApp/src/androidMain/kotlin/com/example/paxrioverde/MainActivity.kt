@@ -3,20 +3,27 @@ package com.example.paxrioverde
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
+import com.example.paxrioverde.util.AppUpdateManager
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
+
+    private lateinit var appUpdateManager: AppUpdateManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         
         AndroidContext.initialize(this)
+        appUpdateManager = AppUpdateManager(this)
+        appUpdateManager.checkForUpdates()
+
         requestNotificationPermission()
 
         val initialScreen = when (getInitialNavigation(intent)) {
@@ -27,6 +34,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             App(initialScreen = initialScreen)
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        appUpdateManager.onResume()
     }
 
     private fun requestNotificationPermission() {

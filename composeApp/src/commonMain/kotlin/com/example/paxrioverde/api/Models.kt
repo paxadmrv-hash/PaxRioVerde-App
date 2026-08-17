@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class LoginResponse(
     @SerialName("statusCode") val statusCode: Int? = null,
-    @SerialName("success") val success: Boolean,
+    @SerialName("success") val success: Boolean = false,
     @SerialName("message") val message: String? = null,
     @SerialName("idfilial") val idfilial: Int? = null,
     @SerialName("idcliente") val idcliente: Int? = null,
@@ -21,7 +21,9 @@ data class LoginResponse(
     @SerialName("idmensalidade_prox_mens") val idmensalidade_prox_mens: Int? = null,
     @SerialName("valormens_prox_mens") val valormens_prox_mens: String? = null,
     @SerialName("boleto_prox_mens") val boleto_prox_mens: Boolean? = false,
-    @SerialName("cpf") val cpf: String? = null
+    @SerialName("cpf") val cpf: String? = null,
+    @SerialName("dependente") val dependente: String? = "N",
+    @SerialName("token") val token: String? = null
 )
 
 @Serializable
@@ -147,6 +149,11 @@ data class PetsResponse(
     @SerialName("success") val success: Boolean,
     @SerialName("message") val message: String? = null,
     @SerialName("pets") val pets: List<PetItem>? = emptyList()
+)
+
+@Serializable
+data class ListaPetsRequest(
+    @SerialName("idcliente") val idcliente: Int
 )
 
 @Serializable

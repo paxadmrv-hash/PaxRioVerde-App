@@ -11,30 +11,36 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.paxrioverde.ui.components.PaxButton
+import com.example.paxrioverde.ui.components.bounceClick
+import com.example.paxrioverde.ui.components.shimmerEffect
+import com.example.paxrioverde.ui.theme.PaxDesignSystem
 import com.example.paxrioverde.util.urlEncode
 import org.jetbrains.compose.resources.painterResource
 import paxrioverde.composeapp.generated.resources.*
 
-// Cores Institucionais
-val BrandGreenMain = Color(0xFF386641)
-val BrandGreenDark = Color(0xFF254D2E)
-val WhatsAppColor = Color(0xFF25D366)
-val SoftGray = Color(0xFFF7F9FB)
+// Senior Theme Integration
+private val BrandGreenMain = PaxDesignSystem.Colors.BrandGreen
+private val WhatsAppColor = Color(0xFF25D366)
+private val SoftGray = PaxDesignSystem.Colors.Background
 
 @Composable
 fun ExamesLaboratoriaisScreen(onBack: () -> Unit) {
     val uriHandler = LocalUriHandler.current
+    val haptic = LocalHapticFeedback.current
     val whatsappNumber = "556484037105"
     val contatoDireto = "64992784186"
 
@@ -43,24 +49,31 @@ fun ExamesLaboratoriaisScreen(onBack: () -> Unit) {
         "TSH e T4 Livre", "Vitamina D e B12", "Ureia e Creatinina",
         "EAS (Urina) e Parasitológico", "TGO e TGP (Fígado)"
     )
+    
+    // Performance Elite: Conteúdo adiado para garantir fluidez
+    var isReady by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(400)
+        isReady = true
+    }
 
     Scaffold(
-        containerColor = Color.White,
+        containerColor = PaxDesignSystem.Colors.White,
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .navigationBarsPadding(),
-            contentPadding = PaddingValues(bottom = 32.dp)
+            contentPadding = PaddingValues(bottom = 32.dp + padding.calculateBottomPadding())
         ) {
-            item { HeaderSection(onBack) }
+            item { HeaderSectionExames(onBack) }
 
             item {
                 Column(modifier = Modifier.padding(horizontal = 24.dp)) {
 
                     // Banner de Desconto
                     Surface(
-                        modifier = Modifier.padding(top = 24.dp),
+                        modifier = Modifier.padding(top = 24.dp).bounceClick(),
                         color = BrandGreenMain.copy(alpha = 0.08f),
                         shape = RoundedCornerShape(12.dp),
                         border = BorderStroke(1.dp, BrandGreenMain.copy(alpha = 0.2f))
@@ -79,7 +92,7 @@ fun ExamesLaboratoriaisScreen(onBack: () -> Unit) {
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Horários e Contato (Simétricos)
+                    // Horários e Contato
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -98,6 +111,7 @@ fun ExamesLaboratoriaisScreen(onBack: () -> Unit) {
                             modifier = Modifier.weight(1f),
                             instruction = "Toque para ligar",
                             onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 uriHandler.openUri("tel:$contatoDireto")
                             }
                         )
@@ -109,7 +123,8 @@ fun ExamesLaboratoriaisScreen(onBack: () -> Unit) {
                     Surface(
                         color = Color(0xFFFFF9E6),
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, Color(0xFFFFE082))
+                        border = BorderStroke(1.dp, Color(0xFFFFE082)),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
                             modifier = Modifier.padding(16.dp),
@@ -131,20 +146,16 @@ fun ExamesLaboratoriaisScreen(onBack: () -> Unit) {
                     Text("Dúvidas ou Orçamentos?", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Gray)
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    Button(
+                    PaxButton(
+                        text = "Chamar no WhatsApp",
                         onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             val msg = "Olá, gostaria de um orçamento para exames laboratoriais."
                             uriHandler.openUri("https://wa.me/$whatsappNumber?text=${urlEncode(msg)}")
                         },
-                        modifier = Modifier.fillMaxWidth().height(60.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = WhatsAppColor),
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
-                    ) {
-                        Icon(painterResource(Res.drawable.ic_whatsapp_social), null, modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text("Chamar no WhatsApp", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    }
+                        containerColor = WhatsAppColor,
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
                     Spacer(modifier = Modifier.height(40.dp))
 
@@ -153,10 +164,14 @@ fun ExamesLaboratoriaisScreen(onBack: () -> Unit) {
                 }
             }
 
-            items(examesPopulares) { exame -> ExameRow(exame) }
+            if (!isReady) {
+                items(5) { ExameSkeleton() }
+            } else {
+                items(examesPopulares) { exame -> ExameRow(exame) }
+            }
 
             item {
-                FooterSection()
+                FooterSectionExames()
             }
         }
     }
@@ -174,7 +189,7 @@ fun QuickInfoCard(
     Surface(
         modifier = modifier
             .height(95.dp)
-            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
+            .then(if (onClick != null) Modifier.bounceClick().clickable { onClick() } else Modifier),
         color = SoftGray,
         shape = RoundedCornerShape(16.dp)
     ) {
@@ -197,12 +212,12 @@ fun QuickInfoCard(
 }
 
 @Composable
-fun HeaderSection(onBack: () -> Unit) {
+fun HeaderSectionExames(onBack: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                brush = Brush.verticalGradient(colors = listOf(BrandGreenMain, BrandGreenDark)),
+                brush = PaxDesignSystem.Gradients.Primary,
                 shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
             )
             .statusBarsPadding()
@@ -227,7 +242,7 @@ fun HeaderSection(onBack: () -> Unit) {
 @Composable
 fun ExameRow(nome: String) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp).bounceClick(),
         verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.CheckCircle, null, tint = BrandGreenMain.copy(alpha = 0.2f), modifier = Modifier.size(20.dp))
         Spacer(modifier = Modifier.width(16.dp))
@@ -237,7 +252,18 @@ fun ExameRow(nome: String) {
 }
 
 @Composable
-fun FooterSection() {
+fun ExameSkeleton() {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.size(20.dp).clip(CircleShape).shimmerEffect())
+        Spacer(modifier = Modifier.width(16.dp))
+        Box(modifier = Modifier.width(200.dp).height(14.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+    }
+}
+
+@Composable
+fun FooterSectionExames() {
     Column(
         modifier = Modifier.fillMaxWidth().padding(top = 32.dp, bottom = 60.dp).padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally

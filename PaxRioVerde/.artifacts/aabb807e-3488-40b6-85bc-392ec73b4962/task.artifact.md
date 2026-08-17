@@ -1,0 +1,19 @@
+- [x] Modernização Premium da Carteira Virtual
+    - [x] Criar componente `PaxPageIndicator` animado
+    - [x] Implementar efeito 3D (Rotation Y) no carrossel de cartões
+    - [x] Aplicar estilo Glassmorphism nos cards da lista
+    - [x] Adicionar animações de entrada (Cascade effect)
+- [x] Refinamento de Layout e Cabeçalho Premium
+    - [x] Tornar `PaxScreenHeader` flexível (suporte a fundo transparente/dark)
+    - [x] Corrigir truncamento de nomes no `ActiveCardRow`
+    - [x] Ajustar espaçamento do Cabeçalho na Carteira Virtual
+- [x] Segurança de Dados e Criptografia
+    - [x] Configurar `androidx.security:security-crypto` no Android
+    - [x] Implementar `EncryptedSharedPreferences` no Android
+    - [x] Definir estratégia de segurança para iOS (Keychain)
+- [x] Otimização de Performance e Memória
+    - [x] Implementar Downsampling no `AsyncImageWrapper.android.kt`
+    - [x] Implementar Downsampling no `AsyncImageWrapper.ios.kt`
+    - [x] Adicionar limite e limpeza de cache no `WalletCache.kt`
+- [x] Refinamentos de UX Pontuais
+    - [x] Aumentar destaque do banner de desconto na tela Financeira

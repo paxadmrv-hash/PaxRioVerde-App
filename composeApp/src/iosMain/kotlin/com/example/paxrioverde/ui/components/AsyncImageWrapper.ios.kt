@@ -1,4 +1,4 @@
-package com.example.paxrioverde.ui.pet
+package com.example.paxrioverde.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.*
@@ -8,13 +8,13 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.jetbrains.skia.Image as SkiaImage
 import androidx.compose.ui.layout.ContentScale
 import org.jetbrains.compose.resources.painterResource
-import platform.UIKit.UIImage
 import platform.Foundation.NSData
 import platform.Foundation.NSDataBase64DecodingIgnoreUnknownCharacters
 import platform.Foundation.create
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
+import platform.posix.memcpy
 
 @OptIn(ExperimentalForeignApi::class)
 @Composable
@@ -31,7 +31,10 @@ actual fun AsyncImageWrapper(
                 val base64String = uri.substringAfter("base64,")
                 val nsData = NSData.create(base64EncodedString = base64String, options = NSDataBase64DecodingIgnoreUnknownCharacters)
                 if (nsData != null) {
-                    val bytes = nsData.toByteArray()
+                    val bytes = ByteArray(nsData.length.toInt())
+                    bytes.usePinned { pinned ->
+                        memcpy(pinned.addressOf(0), nsData.bytes, nsData.length)
+                    }
                     val skiaImage = SkiaImage.makeFromEncoded(bytes)
                     imageBitmap = skiaImage.toComposeImageBitmap()
                 }

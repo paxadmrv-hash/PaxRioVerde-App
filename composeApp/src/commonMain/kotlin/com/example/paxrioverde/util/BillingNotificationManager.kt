@@ -117,7 +117,7 @@ object BillingNotificationManager {
                 }
             }
         } catch (e: Exception) {
-            println("Error scheduling notifications: ${e.message}")
+            PaxLogger.e("Error scheduling notifications", e, "BillingNotificationManager")
         }
     }
 }

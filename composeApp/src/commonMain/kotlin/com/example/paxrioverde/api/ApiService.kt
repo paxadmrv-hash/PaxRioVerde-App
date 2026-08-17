@@ -11,8 +11,10 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import com.example.paxrioverde.util.AppConstants
+import com.example.paxrioverde.util.SessionManager
+import com.example.paxrioverde.util.isDebug
 
-object ApiService {
+class ApiService(private val sessionManager: SessionManager) {
     val client = HttpClient {
         install(ContentNegotiation) {
             json(Json {
@@ -23,18 +25,33 @@ object ApiService {
             })
         }
         install(Logging) {
-            level = LogLevel.ALL
+            level = if (isDebug) LogLevel.ALL else LogLevel.INFO
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = 120000
-            connectTimeoutMillis = 120000
-            socketTimeoutMillis = 120000
+            requestTimeoutMillis = 60000
+            connectTimeoutMillis = 30000
+            socketTimeoutMillis = 30000
+        }
+        install(HttpRequestRetry) {
+            maxRetries = 3
+            retryIf { _, response ->
+                !response.status.isSuccess() && response.status.value in 500..599
+            }
+            retryOnExceptionIf { _, cause ->
+                cause is kotlinx.io.IOException || cause is io.ktor.client.network.sockets.SocketTimeoutException
+            }
+            exponentialDelay()
         }
         defaultRequest {
             url(AppConstants.BASE_URL)
             header(HttpHeaders.Accept, "*/*")
             header(HttpHeaders.Connection, "keep-alive")
             header(HttpHeaders.UserAgent, "PostmanRuntime/7.32.3")
+            
+            // Adiciona Token se disponível
+            sessionManager.getAccessToken()?.let { token ->
+                header(HttpHeaders.Authorization, "Bearer $token")
+            }
         }
     }
 
@@ -237,33 +254,35 @@ object ApiService {
     }
 
     suspend fun listaPets(idcliente: Int): PetsResponse {
-        return client.post("lista_pets_app") {
-            setBody(FormDataContent(Parameters.build {
-                append("idcliente", idcliente.toString())
-            }))
+        return client.post("lista_pet") {
+            url {
+                parameters.append("idcliente", idcliente.toString())
+            }
         }.body()
     }
 
     suspend fun inserirPet(
+        idcliente: Int,
         idcontrato: Int,
         idconvenio: Int,
+        idpet: Int,
         nome: String,
         raca: String,
         dtnascimento: String,
         foto: String,
-        situacao: String,
-        idpet: Int
+        situacao: String
     ): PetActionResponse {
-        return client.post("inserir_pet_app") {
+        return client.post("inserir_pet") {
             setBody(FormDataContent(Parameters.build {
+                append("idcliente", idcliente.toString())
                 append("idcontrato", idcontrato.toString())
                 append("idconvenio", idconvenio.toString())
+                append("idpet", idpet.toString())
                 append("nome", nome)
                 append("raca", raca)
                 append("dtnascimento", dtnascimento)
                 append("foto", foto)
                 append("situacao", situacao)
-                append("idpet", idpet.toString())
             }))
         }.body()
     }
@@ -298,6 +317,16 @@ object ApiService {
                 append("senha", senha)
                 append("password", senha)
                 append("codigo", token)
+            }))
+        }.body()
+    }
+
+    suspend fun atuCpfDependente(idcliente: Int, cpf: String, nomedependente: String): GenericResponse {
+        return client.post("atu_cpf_dependente") {
+            setBody(FormDataContent(Parameters.build {
+                append("idcliente", idcliente.toString())
+                append("cpf", cpf)
+                append("nomedependente", nomedependente)
             }))
         }.body()
     }

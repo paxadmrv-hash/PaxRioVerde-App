@@ -1,4 +1,4 @@
-package com.example.paxrioverde.ui.pet
+package com.example.paxrioverde.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
@@ -12,8 +12,7 @@ actual fun AsyncImageWrapper(
     placeholder: org.jetbrains.compose.resources.DrawableResource,
     modifier: Modifier
 ) {
-    // No JVM/Desktop, usamos o placeholder. 
-    // Para suporte real a imagens, bibliotecas como Coil3 ou KMP-Image-Loader seriam necessárias.
+    // Implementação básica para JS (pode ser melhorada com HTML Image)
     Image(
         painter = painterResource(placeholder),
         contentDescription = null,

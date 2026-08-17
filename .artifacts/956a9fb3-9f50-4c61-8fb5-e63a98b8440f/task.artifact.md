@@ -1,0 +1,4 @@
+- [x] Adicionar estados para o Modal e dependente selecionado em `PlansScreen.kt`
+- [x] Atualizar o componente `DependentSoftCard` com o botão "Liberar acesso ao aplicativo"
+- [x] Criar o componente `AccessModal` com instruções para idosos e campo de CPF
+- [x] Validar o fluxo visual e animações de simulação

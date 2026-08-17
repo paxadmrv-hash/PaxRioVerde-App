@@ -17,47 +17,54 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.paxrioverde.Screen
+import com.example.paxrioverde.ui.theme.PaxDesignSystem
 
-// CORES
-val BrandLime = Color(0xFF386641)
-val SoftBackground = Color(0xFFF8F9FA)
-val SurfaceWhite = Color(0xFFFFFFFF)
-val TextDark = Color(0xFF2D3436)
-val TextGray = Color(0xFF636E72)
+// Senior Theme Integration: Centralizado no PaxDesignSystem
+private val BrandLime = PaxDesignSystem.Colors.BrandGreen
+private val SoftBackground = PaxDesignSystem.Colors.Background
+private val SurfaceWhite = PaxDesignSystem.Colors.Surface
+private val TextDark = PaxDesignSystem.Colors.TextDark
+private val TextGray = PaxDesignSystem.Colors.TextSecondary
 
 data class DrawerMenuItem(val icon: ImageVector, val text: String, val screen: Screen)
 
 @Composable
 fun AppDrawer(
     currentScreen: Screen,
+    isDependent: Boolean = false,
     onNavigate: (Screen) -> Unit,
     onLogout: () -> Unit,
     closeDrawer: () -> Unit
 ) {
-    val drawerItems = remember {
-        listOf(
+    val drawerItems = remember(isDependent) {
+        listOfNotNull(
             DrawerMenuItem(Icons.Outlined.Home, "Início", Screen.Dashboard),
             DrawerMenuItem(Icons.AutoMirrored.Outlined.ReceiptLong, "Mensalidades", Screen.Finance),
-            DrawerMenuItem(Icons.Outlined.Description, "Meu Plano", Screen.Plans),
+            if (!isDependent) DrawerMenuItem(Icons.Outlined.Description, "Meu Plano", Screen.Plans) else null,
+            DrawerMenuItem(Icons.Outlined.Fingerprint, "Biometria", Screen.Biometrics),
             DrawerMenuItem(Icons.Outlined.SupportAgent, "Fale Conosco", Screen.Contact)
         )
     }
+    val haptic = LocalHapticFeedback.current
 
     ModalDrawerSheet(
         drawerContainerColor = Color.Transparent,
         drawerTonalElevation = 0.dp,
         modifier = Modifier
             .width(320.dp)
+            .statusBarsPadding()
             .padding(12.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxHeight()
-                .background(SoftBackground, RoundedCornerShape(24.dp))
+                .background(SoftBackground, PaxDesignSystem.Shapes.Large)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -65,8 +72,8 @@ fun AppDrawer(
             // CABEÇALHO
             Surface(
                 color = SurfaceWhite,
-                shape = RoundedCornerShape(20.dp),
-                shadowElevation = 4.dp,
+                shape = PaxDesignSystem.Shapes.Medium,
+                shadowElevation = 2.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
@@ -120,13 +127,16 @@ fun AppDrawer(
 
                     Surface(
                         onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onNavigate(item.screen)
                             closeDrawer()
                         },
-                        shape = RoundedCornerShape(16.dp),
+                        shape = PaxDesignSystem.Shapes.Medium,
                         color = if (isSelected) SurfaceWhite else Color.Transparent,
-                        shadowElevation = if (isSelected) 4.dp else 0.dp,
-                        modifier = Modifier.fillMaxWidth()
+                        shadowElevation = if (isSelected) 2.dp else 0.dp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .bounceClick()
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -155,12 +165,15 @@ fun AppDrawer(
             // RODAPÉ E SAIR
             Surface(
                 onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onLogout()
                     closeDrawer()
                 },
-                color = Color(0xFFFFEBEE),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth()
+                color = PaxDesignSystem.Colors.Error.copy(alpha = 0.08f),
+                shape = PaxDesignSystem.Shapes.Medium,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bounceClick()
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -169,14 +182,15 @@ fun AppDrawer(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ExitToApp,
                         contentDescription = null,
-                        tint = Color(0xFFD32F2F),
+                        tint = PaxDesignSystem.Colors.Error,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
                         text = "Sair da conta",
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFD32F2F)
+                        fontWeight = FontWeight.Black,
+                        color = PaxDesignSystem.Colors.Error,
+                        fontSize = 15.sp
                     )
                 }
             }

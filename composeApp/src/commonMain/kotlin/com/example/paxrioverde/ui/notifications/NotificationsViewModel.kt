@@ -1,38 +1,27 @@
 package com.example.paxrioverde.ui.notifications
 
-import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
-import kotlinx.datetime.Clock
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
+import com.example.paxrioverde.util.NotificationManager
 
-object NotificationCenter {
-    private val _notifications = mutableStateListOf<NotificationItem>()
-    val notifications: List<NotificationItem> = _notifications
+/**
+ * NotificationsViewModel: Gerencia a UI da tela de notificações.
+ * Senior Note: Utiliza o NotificationManager para persistência e lógica de negócio.
+ */
+class NotificationsViewModel(
+    private val notificationManager: NotificationManager
+) : ViewModel() {
 
-    fun addNotification(title: String, message: String, type: NotificationType) {
-        val id = (_notifications.maxOfOrNull { it.id } ?: 0) + 1
-        val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-        val timeStr = "${now.dayOfMonth.toString().padStart(2, '0')}/${now.monthNumber.toString().padStart(2, '0')} ${now.hour.toString().padStart(2, '0')}:${now.minute.toString().padStart(2, '0')}"
-        
-        _notifications.add(0, NotificationItem(id, title, message, timeStr, type))
+    val notifications: List<NotificationItem> = notificationManager.notifications
+
+    fun marcarComoLida(id: Int) {
+        notificationManager.markAsRead(id)
     }
 
-    fun clear() {
-        _notifications.clear()
+    fun removerNotificacao(id: Int) {
+        notificationManager.removeNotification(id)
     }
 
-    init {
-        if (_notifications.isEmpty()) {
-            _notifications.add(NotificationItem(1, "Bem-vindo!", "Obrigado por instalar o novo App Grupo Universo.", "01/11 08:00", NotificationType.SYSTEM, true))
-        }
-    }
-}
-
-class NotificationsViewModel : ViewModel() {
-    val notifications: List<NotificationItem> = NotificationCenter.notifications
-
-    fun limparNotificacoes() {
-        NotificationCenter.clear()
+    fun limparTudo() {
+        notificationManager.clearAll()
     }
 }

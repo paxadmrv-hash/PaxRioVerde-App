@@ -1,6 +1,5 @@
 package com.example.paxrioverde.ui.refer
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -22,15 +21,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.paxrioverde.ui.components.PaxButton
+import com.example.paxrioverde.ui.components.PaxTextField
+import com.example.paxrioverde.ui.theme.PaxDesignSystem
 import com.example.paxrioverde.util.urlEncode
 
-// CORES PADRÃO DO APP (Pax Rio Verde / Grupo Universo)
-val BrandGreenRefer = Color(0xFF386641)
-val BrandLimeRefer = Color(0xFF386641)
-val GoldAccent = Color(0xFFEAB365)
-val SurfaceGray = Color(0xFFF8F9FA)
+// CORES LOCAIS REFINADAS
+val ReferGold = Color(0xFFF59E0B)
+val ReferBackground = Color(0xFFF9FAFB)
 
 @Composable
 fun ReferFriendScreen(onBack: () -> Unit) {
@@ -53,25 +56,24 @@ fun ReferFriendScreen(onBack: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(PaxDesignSystem.Colors.White)
             .navigationBarsPadding()
+            .imePadding()
     ) {
-        // CABEÇALHO
+        // CABEÇALHO (HERO)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(bottomStart = 40.dp, bottomEnd = 40.dp))
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(BrandGreenRefer, BrandLimeRefer)
-                    )
-                )
+                .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+                .background(PaxDesignSystem.Gradients.Primary)
                 .statusBarsPadding()
-                .padding(horizontal = 24.dp, vertical = 24.dp)
+                .padding(horizontal = 24.dp, vertical = 32.dp)
         ) {
             IconButton(
                 onClick = onBack,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(Color.White.copy(alpha = 0.15f), CircleShape)
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -80,24 +82,24 @@ fun ReferFriendScreen(onBack: () -> Unit) {
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             Text(
                 text = "Indicou, Fechou,\nGanhou!!!",
-                fontSize = 32.sp,
+                fontSize = 36.sp,
                 fontWeight = FontWeight.Black,
                 color = Color.White,
-                lineHeight = 38.sp,
-                letterSpacing = (-1).sp
+                lineHeight = 40.sp,
+                letterSpacing = (-1.5).sp
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = "Não deixe seu amigo de fora e desfrute dos nossos benefícios juntos!",
-                fontSize = 15.sp,
-                color = Color.White.copy(alpha = 0.9f),
-                lineHeight = 20.sp,
+                text = "Compartilhe os benefícios da Pax com seus amigos e seja recompensado.",
+                fontSize = 16.sp,
+                color = Color.White.copy(alpha = 0.85f),
+                lineHeight = 22.sp,
                 fontWeight = FontWeight.Medium
             )
         }
@@ -113,8 +115,9 @@ fun ReferFriendScreen(onBack: () -> Unit) {
             // BENTO GRID - CARDS DE RECOMPENSA
             Text(
                 text = "Veja o que você pode ganhar",
-                fontWeight = FontWeight.Bold,
-                color = BrandGreenRefer,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 18.sp,
+                color = PaxDesignSystem.Colors.TextDark,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
@@ -125,16 +128,18 @@ fun ReferFriendScreen(onBack: () -> Unit) {
                 RewardCard(
                     modifier = Modifier.weight(1f),
                     title = "Mensalidade",
-                    desc = "Para associados: Ganhe 1 mês grátis",
+                    desc = "Ganhos para associados",
+                    benefit = "1 MÊS GRÁTIS",
                     icon = Icons.AutoMirrored.Filled.FactCheck,
-                    color = GoldAccent
+                    color = ReferGold
                 )
                 RewardCard(
                     modifier = Modifier.weight(1f),
                     title = "Renda Extra",
-                    desc = "Não associados: Receba R$ 50,00 ao indicar",
+                    desc = "Para todos usuários",
+                    benefit = "R$ 50,00",
                     icon = Icons.Default.Payments,
-                    color = BrandLimeRefer
+                    color = PaxDesignSystem.Colors.BrandLightGreen
                 )
             }
 
@@ -142,99 +147,118 @@ fun ReferFriendScreen(onBack: () -> Unit) {
 
             // FORMULÁRIO DE INDICAÇÃO
             Surface(
-                color = SurfaceGray,
-                shape = RoundedCornerShape(24.dp),
+                color = ReferBackground,
+                shape = PaxDesignSystem.Shapes.Card,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(
                         text = "Quem você vai indicar?",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 20.sp,
+                        color = PaxDesignSystem.Colors.TextDark,
                         modifier = Modifier.padding(bottom = 20.dp)
                     )
 
-                    OutlinedTextField(
+                    PaxTextField(
                         value = friendName,
                         onValueChange = { friendName = it },
-                        label = { Text("Nome do Amigo") },
-                        leadingIcon = { Icon(Icons.Default.Person, null, tint = BrandGreenRefer) },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = BrandGreenRefer,
-                            unfocusedBorderColor = Color.Transparent,
-                            unfocusedContainerColor = Color.White,
-                            focusedContainerColor = Color.White
-                        )
+                        label = "Nome do Amigo",
+                        leadingIcon = Icons.Default.Person
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    OutlinedTextField(
+                    PaxTextField(
                         value = friendPhone,
-                        onValueChange = { friendPhone = it },
-                        label = { Text("WhatsApp") },
-                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.Chat, null, tint = BrandGreenRefer) },
+                        onValueChange = { 
+                            // Senior Note: Filtra apenas números e limita a 11 dígitos (celular com DDD)
+                            val digits = it.filter { char -> char.isDigit() }
+                            if (digits.length <= 11) friendPhone = digits 
+                        },
+                        label = "WhatsApp (Com DDD)",
+                        leadingIcon = Icons.AutoMirrored.Filled.Chat,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = BrandGreenRefer,
-                            unfocusedBorderColor = Color.Transparent,
-                            unfocusedContainerColor = Color.White,
-                            focusedContainerColor = Color.White
-                        )
+                        visualTransformation = PhoneVisualTransformation()
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    Button(
+                    PaxButton(
+                        text = if (isFormValid) "Enviar Indicação" else "Preencha os dados",
                         onClick = { handleSendIndication() },
                         enabled = isFormValid,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = BrandGreenRefer,
-                            disabledContainerColor = Color.LightGray
-                        )
-                    ) {
-                        AnimatedVisibility(visible = isFormValid) {
-                            Icon(Icons.AutoMirrored.Filled.Send, null)
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (isFormValid) "Enviar Indicação Agora" else "Preencha os dados",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
-                    }
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(PaxDesignSystem.Colors.Error.copy(alpha = 0.05f))
+                    .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(contentDescription = "Condição para pagamento",
+                Icon(
                     imageVector = Icons.Default.Info,
-                    tint = Color(0xFF0288D1),
-                    modifier = Modifier.size(18.dp)
+                    contentDescription = null,
+                    tint = PaxDesignSystem.Colors.Error,
+                    modifier = Modifier.size(20.dp)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "SÓ GANHA A MENSALIDADE OU EXTRA MEDIANTE CONFIRMAÇÃO DO PLANO E PAGAMENTO DA ADESÃO DO INDICADO.",
-                    fontSize = 11.sp,
-                    color = Color.Red
+                    text = "A bonificação é liberada após a confirmação do plano e o pagamento da adesão pelo indicado.",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = PaxDesignSystem.Colors.Error,
+                    lineHeight = 16.sp
                 )
             }
+            
+            Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+}
+
+/**
+ * Máscara de Telefone (Brasil)
+ */
+class PhoneVisualTransformation : VisualTransformation {
+    override fun filter(text: androidx.compose.ui.text.AnnotatedString): TransformedText {
+        val trimmed = if (text.text.length >= 11) text.text.substring(0, 11) else text.text
+        var out = ""
+        for (i in trimmed.indices) {
+            if (i == 0) out += "("
+            out += trimmed[i]
+            if (i == 1) out += ") "
+            if (i == 6) out += "-"
+        }
+
+        val numberOffsetTranslator = object : OffsetMapping {
+            override fun originalToTransformed(offset: Int): Int {
+                // Senior Fix: Garante que offset 0 nunca retorne > 0 se o texto for vazio,
+                // e usa coerceAtMost para evitar índices fora do range da string formatada.
+                if (offset <= 0) return 0
+                if (offset < 2) return (offset + 1).coerceAtMost(out.length)
+                if (offset < 7) return (offset + 3).coerceAtMost(out.length)
+                return (offset + 4).coerceAtMost(out.length)
+            }
+
+            override fun transformedToOriginal(offset: Int): Int {
+                if (offset <= 1) return 0
+                if (offset <= 2) return (offset - 1).coerceAtLeast(0)
+                if (offset <= 5) return 2
+                if (offset <= 10) return (offset - 3).coerceAtLeast(0)
+                if (offset <= 11) return 7
+                return (offset - 4).coerceAtMost(trimmed.length)
+            }
+        }
+
+        return TransformedText(androidx.compose.ui.text.AnnotatedString(out), numberOffsetTranslator)
     }
 }
 
@@ -243,30 +267,50 @@ fun RewardCard(
     modifier: Modifier,
     title: String,
     desc: String,
+    benefit: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     color: Color
 ) {
     Surface(
-        modifier = modifier.height(140.dp),
-        color = SurfaceGray,
-        shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.3f))
+        modifier = modifier.height(160.dp),
+        color = ReferBackground,
+        shape = PaxDesignSystem.Shapes.Card,
+        border = BorderStroke(1.dp, color.copy(alpha = 0.2f))
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
-                    .background(color.copy(alpha = 0.1f), CircleShape),
+                    .size(40.dp)
+                    .background(color.copy(alpha = 0.12f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
+                Icon(icon, null, tint = color, modifier = Modifier.size(22.dp))
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text(desc, fontSize = 12.sp, color = Color.Gray, lineHeight = 14.sp)
+            
+            Column {
+                Text(
+                    text = title, 
+                    fontWeight = FontWeight.Bold, 
+                    fontSize = 13.sp,
+                    color = PaxDesignSystem.Colors.TextSecondary
+                )
+                Text(
+                    text = benefit, 
+                    fontWeight = FontWeight.Black, 
+                    fontSize = 18.sp, 
+                    color = color
+                )
+                Text(
+                    text = desc, 
+                    fontSize = 11.sp, 
+                    color = PaxDesignSystem.Colors.TextSecondary,
+                    lineHeight = 13.sp,
+                    maxLines = 2
+                )
+            }
         }
     }
 }

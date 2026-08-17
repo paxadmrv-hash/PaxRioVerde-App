@@ -2,9 +2,9 @@ package com.example.paxrioverde.ui.virtualcard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.paxrioverde.api.ApiService
 import com.example.paxrioverde.api.CartaoItem
-import com.example.paxrioverde.api.WalletCache
+import com.example.paxrioverde.domain.model.NetworkResult
+import com.example.paxrioverde.domain.repository.VirtualCardRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +18,10 @@ sealed class VirtualCardState {
     data class Error(val message: String) : VirtualCardState()
 }
 
-class VirtualCardViewModel : ViewModel() {
+class VirtualCardViewModel(
+    private val repository: VirtualCardRepository
+) : ViewModel() {
+
     private val _uiState = MutableStateFlow<VirtualCardState>(VirtualCardState.Idle)
     val uiState: StateFlow<VirtualCardState> = _uiState.asStateFlow()
 
@@ -27,16 +30,23 @@ class VirtualCardViewModel : ViewModel() {
     fun gerarCartaoPix(idcaixa: Int, idcliente: Int, tipo: String, nomeDependente: String, estiloSelecionado: String) {
         viewModelScope.launch {
             _uiState.value = VirtualCardState.Loading
-            try {
-                val response = ApiService.gerarCartaoPix(idcaixa, idcliente, tipo, nomeDependente)
-                if (response.success && response.pix != null && response.identificador_pix != null) {
-                    _uiState.value = VirtualCardState.PixGenerated(response.pix, response.identificador_pix)
-                    startPolling(response.identificador_pix, idcliente, estiloSelecionado)
-                } else {
-                    _uiState.value = VirtualCardState.Error(response.message ?: "Erro ao gerar PIX")
+            
+            val result = repository.gerarCartaoPix(idcaixa, idcliente, tipo, nomeDependente)
+
+            when (result) {
+                is NetworkResult.Success -> {
+                    val response = result.data
+                    if (response.success && response.pix != null && response.identificador_pix != null) {
+                        _uiState.value = VirtualCardState.PixGenerated(response.pix, response.identificador_pix)
+                        startPolling(response.identificador_pix, idcliente, estiloSelecionado)
+                    } else {
+                        _uiState.value = VirtualCardState.Error(response.message ?: "Erro ao gerar PIX")
+                    }
                 }
-            } catch (e: Exception) {
-                _uiState.value = VirtualCardState.Error("Erro de conexão: ${e.message}")
+                is NetworkResult.Error -> {
+                    _uiState.value = VirtualCardState.Error(result.message)
+                }
+                else -> {}
             }
         }
     }
@@ -46,14 +56,12 @@ class VirtualCardViewModel : ViewModel() {
         pollingJob = viewModelScope.launch {
             while (isActive) {
                 delay(5000)
-                try {
-                    val response = ApiService.verificarPixPago(identificadorPix)
-                    if (response.pago) {
-                        onPaymentSuccess(idcliente, estiloSelecionado)
-                        break
-                    }
-                } catch (e: Exception) {
-                    // Silently continue polling on network error
+                
+                val result = repository.verificarPixPago(identificadorPix)
+                
+                if (result is NetworkResult.Success && result.data) {
+                    onPaymentSuccess(idcliente, estiloSelecionado)
+                    break
                 }
             }
         }
@@ -74,55 +82,47 @@ class VirtualCardViewModel : ViewModel() {
     ) {
         viewModelScope.launch {
             _uiState.value = VirtualCardState.Loading
-            try {
-                val gratuitoString = if (isGratuito) "S" else "N"
-                
-                val response = ApiService.gerarCartao(
-                    idcaixa = idcaixa,
-                    idcliente = idcliente,
-                    tipo = tipo,
-                    nomeDependente = nomeDependente,
-                    gratuito = gratuitoString,
-                    idcontrato = idcontrato,
-                    idconvenio = idconvenio,
-                    cpfDependente = cpfDependente,
-                    dtvencimento = dtvencimento,
-                    parentesco = parentesco,
-                    idfilial = idfilial
-                )
-                
-                if (response.success) {
-                    onPaymentSuccess(idcliente, "Adulto") // Estilo padrão para refresh
-                } else {
-                    _uiState.value = VirtualCardState.Error(response.message ?: "Erro ao gerar cartão")
+            
+            val result = repository.gerarCartaoDireto(
+                idcaixa, idcliente, tipo, nomeDependente, isGratuito,
+                idcontrato, idconvenio, cpfDependente, dtvencimento, parentesco, idfilial
+            )
+
+            when (result) {
+                is NetworkResult.Success -> {
+                    val response = result.data
+                    if (response.success) {
+                        onPaymentSuccess(idcliente, "Adulto")
+                    } else {
+                        _uiState.value = VirtualCardState.Error(response.message ?: "Erro ao gerar cartão")
+                    }
                 }
-            } catch (e: Exception) {
-                _uiState.value = VirtualCardState.Error("Erro de conexão: ${e.message}")
+                is NetworkResult.Error -> {
+                    _uiState.value = VirtualCardState.Error(result.message)
+                }
+                else -> {}
             }
         }
     }
 
     private suspend fun onPaymentSuccess(idcliente: Int, estiloSelecionado: String) {
-        val oldIds = WalletCache.cartoesList.map { it.idControle }.toSet()
+        val oldIds = repository.getCartoes().map { it.idControle }.toSet()
         
-        // Refresh cache
-        WalletCache.clear()
-        WalletCache.preLoad(idcliente, forceRefresh = true)
+        // Refresh cache via Repository
+        repository.refreshData(idcliente)
         
-        val newCard = WalletCache.cartoesList.find { it.idControle !in oldIds }
+        val newCard = repository.getCartoes().find { it.idControle !in oldIds }
         
-        // Apply style override (using the same mechanism as in VirtualCardScreen.kt)
-        newCard?.let {
-            // We need a way to access cardStyleOverrides. 
-            // In VirtualCardScreen.kt it is a private top-level property.
-            // For now, we'll assume the UI will handle the override when it sees the Success state.
-        }
-
         _uiState.value = VirtualCardState.Success(newCard)
     }
 
     fun resetState() {
         pollingJob?.cancel()
         _uiState.value = VirtualCardState.Idle
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        pollingJob?.cancel()
     }
 }

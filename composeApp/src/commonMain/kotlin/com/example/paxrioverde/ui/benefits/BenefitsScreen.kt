@@ -2,42 +2,62 @@ package com.example.paxrioverde.ui.benefits
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.paxrioverde.api.CartaoItem
+import com.example.paxrioverde.api.WalletCache
+import com.example.paxrioverde.ui.components.shimmerEffect
+import com.example.paxrioverde.util.SessionManager
 import com.example.paxrioverde.util.shareText
 import com.example.paxrioverde.util.urlEncode
+import kotlin.time.Duration.Companion.milliseconds
 import org.jetbrains.compose.resources.painterResource
+import org.koin.compose.koinInject
+import org.koin.compose.viewmodel.koinViewModel
+import paxrioverde.composeapp.generated.resources.*
 import paxrioverde.composeapp.generated.resources.Res
 import paxrioverde.composeapp.generated.resources.ic_whatsapp_social
-
-
 
 // ─────────────────────────────────────────────
 // DESIGN TOKENS
@@ -46,7 +66,6 @@ private val Forest800 = Color(0xFF1E3A2F)
 private val Forest600 = Color(0xFF386641)
 private val Forest50  = Color(0xFFF0F7F1)
 private val Amber500  = Color(0xFFD97706)
-private val Amber50   = Color(0xFFFFFBEB)
 private val Slate800  = Color(0xFF1E293B)
 private val Slate500  = Color(0xFF64748B)
 private val Slate200  = Color(0xFFE2E8F0)
@@ -54,535 +73,645 @@ private val CardWhite = Color(0xFFFFFFFF)
 private val WhatsAppGreen = Color(0xFF25D366)
 
 // ─────────────────────────────────────────────
-// MODELO DE DADOS
+// HELPERS
 // ─────────────────────────────────────────────
-data class Partner(
-    val name: String,
-    val discount: String,
-    val address: String,
-    val phone: String,
-    val whatsapp: String = "",
-    val icon: ImageVector,
-    val category: String,
-    val city: String = "Rio Verde"
-)
+private fun formatCardName(name: String): String {
+    val parts = name.trim().split(" ").filter { it.isNotBlank() }
+    if (parts.size <= 2) return name.uppercase()
+    val firstName = parts.first()
+    val lastName = parts.last()
+    val result = StringBuilder(firstName)
+    for (i in 1 until parts.size - 1) {
+        val part = parts[i]
+        if (part.lowercase() in listOf("da", "de", "do", "das", "dos", "e")) {
+            result.append(" ").append(part)
+        } else {
+            result.append(" ").append(part.first()).append(".")
+        }
+    }
+    result.append(" ").append(lastName)
+    return result.toString().uppercase()
+}
 
-data class BenefitsCategory(
-    val label: String,
-    val icon: ImageVector
-)
-
-// ─────────────────────────────────────────────
-// CATEGORIAS
-// ─────────────────────────────────────────────
-val benefitsCategories = listOf(
-    BenefitsCategory("Todos",        Icons.Default.GridView),
-    BenefitsCategory("ABA",          Icons.Default.Extension),
-    BenefitsCategory("Saúde",        Icons.Default.HealthAndSafety),
-    BenefitsCategory("Pet",          Icons.Default.Pets),
-    BenefitsCategory("Farmácias",    Icons.Default.MedicalServices),
-    BenefitsCategory("Laboratórios", Icons.Default.Science),
-    BenefitsCategory("Óticas",       Icons.Default.RemoveRedEye),
-    BenefitsCategory("Clínicas",     Icons.Default.LocalHospital),
-    BenefitsCategory("Psicologia",   Icons.Default.Psychology),
-    BenefitsCategory("Fisioterapia", Icons.Default.SelfImprovement),
-    BenefitsCategory("Educação",     Icons.Default.School),
-    BenefitsCategory("Alimentação",  Icons.Default.Restaurant),
-    BenefitsCategory("Lazer",       Icons.Default.Movie),
-    BenefitsCategory("Estética",     Icons.Default.Spa),
-    BenefitsCategory("Floricultura", Icons.Default.LocalFlorist),
-    BenefitsCategory("Roupas",       Icons.Default.Checkroom),
-    BenefitsCategory("Fitness",      Icons.Default.FitnessCenter),
-    BenefitsCategory("Gás",       Icons.Default.Category),
-    BenefitsCategory("Chaveiro",     Icons.Default.Key),
-    BenefitsCategory("Manutenção",   Icons.Default.Build),
-)
-
-// ─────────────────────────────────────────────
-// PARCEIROS REAIS
-// ─────────────────────────────────────────────
-val realPartners: List<Partner> = listOf(
-    // TERAPIA ABA
-    Partner("Clínica Bambinos Espaço Terapêutico Infantil", "Descontos Especiais em Terapias\nAtendimento: Fonoaudiologia ABA, Psicologia ABA, T.O. e Psico-pedagogia",
-        "Rua Abel Pereira de Castro N° 1351 - Setor Central, Rio Verde",
-        "6484037105", "6484037105", Icons.Default.Extension, "ABA"),
-    Partner("Clínica LeveMente", "35% em consultas / 25% em pacotes de terapias\nAtendimento: Psicologia ABA, Fonoaudiologia ABA, Neuropsicologia, Nutrição ABA e convencional, e Psico-pedagogia",
-        "Rua Quinca Honorio N° 118 - Morada do Sol, Rio Verde",
-        "6484037105", "6484037105", Icons.Default.Extension, "ABA"),
-
-    // ACADEMIA
-    Partner("Atlética Academia", "15% à vista na mensalidade",
-        "R. Jeronimo Martins, 536 - Pq. Bandeirantes, Rio Verde",
-        "6498112-8792", "6498112-8792", Icons.Default.FitnessCenter, "Fitness"),
-
-    // ALIMENTACAO
-    Partner("Montana Grill", "Até 15% no cardápio",
-        "Buriti Shopping, Rio Verde",
-        "6499906-0990", "6499906-0990", Icons.Default.Restaurant, "Alimentação"),
-    Partner("Picanha's Bar e Restaurante", "15% no rodizio",
-        "R. Sebastiao Freitas da Silva, 48 - Vila Amalia, Rio Verde",
-        "6430510033", "6499271-1184", Icons.Default.Restaurant, "Alimentação"),
-    Partner("Quero Açaí - Centro", "10% no cardápio (exceto promoções)",
-        "R. Major Oscar Campos, 511 - Centro, Rio Verde",
-        "6436213860", "", Icons.Default.Restaurant, "Alimentação"),
-    Partner("Quero Açaí - Morada do Sol", "10% no cardápio (exceto promoções)",
-        "R. Rosolino Campos, 637 - Morada do Sol, Rio Verde",
-        "6436133375", "6499225-8879", Icons.Default.Restaurant, "Alimentação"),
-
-    // SAÚDE
-    Partner("ALERGISTA", "Até 17% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("ACUPUNTURA", "Até 70% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("ANGIOLOGIA", "Até 28% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("CARDIOLOGISTA", "Até 33% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("CLÍNICO GERAL", "Até 25% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("DERMATOLOGISTA", "Até 12% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("ENDOCRINOLOGISTA", "Até 33% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("FONOAUDIOLOGIA", "Até 55% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("GASTROENTEROLOGIA", "Até 33% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("GERIATRIA", "Até 20% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("GINECOLOGISTA", "Até 33% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("NEFROLOGISTA", "Até 22% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("NEUROLOGISTA", "Até 16% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("NEUROPEDIATRIA", "Até 25% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("NEUROPSICOLOGIA", "Até 25% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("NUTRICIONISTA", "Até 55% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("OFTALMOLOGISTA", "Até 43% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("ONCOLOGISTA", "Até 22% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("ORTOPEDISTA", "Até 30% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("OTORRINOLARINGOLOGISTA", "Até 11% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("PEDIATRIA", "Até 55% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("PNEUMOLOGISTA", "Até 30% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("PSICOPEDAGOGIA", "Até 55% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("PSIQUIATRIA", "Até 16% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("REUMATOLOGISTA", "Até 28% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("TRICOLOGISTA", "Até 25% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("UROLOGISTA", "Até 60% de desconto", "Agendamento via WhatsApp", "6484037105", "6484037105", Icons.Default.HealthAndSafety, "Saúde"),
-
-    // LAZER
-    Partner("Cine A", "Ingresso por R$12,00",
-        "Av. Presidente Vargas, 1470 - Jardim Goias (Shopping Rio Verde), Rio Verde",
-        "6436124216", "", Icons.Default.Movie, "Lazer"),
-
-    // LAZER
-    Partner("Alp Jump", "15% nas sessões e 20% nas meias",
-        "R. Honorio Leao, Qd. 77, Lt. 05 - Setor Morada do Sol, Rio Verde",
-        "6499232-3052", "6499232-3052", Icons.Default.SportsEsports, "Lazer"),
-
-    // CURSOS
-    Partner("Instituto Você", "20% nos treinamentos",
-        "R. 55, 1326 - Setor Aeroporto, Rio Verde",
-        "6239425456", "6299962-6522", Icons.Default.School, "Educação"),
-    Partner("Excellent Global", "45% nas mensalidades e 50% nas Matriculas",
-        "R. Almiro de Moraes, 554 - Setor Central, Rio Verde",
-        "6430510015", "6499995-8013", Icons.Default.School, "Educação"),
-    Partner("Unidombosco - Cursos EAD", "20% nas mensalidades EAD",
-        "Rio Verde - GO",
-        "6436021693", "", Icons.Default.School, "Educação"),
-    Partner("Centro Universitário UNIBRAS / AESGO", "10% nas mensalidades",
-        "R. Doze de Outubro, 42 - Jardim Adriana, Rio Verde",
-        "6435129932", "", Icons.Default.School, "Educação"),
-
-    // FARMACIAS
-    Partner("A Terapêutica Farmácia de Manipulação", "20% à vista (exceto industrializados)",
-        "R. Nizo Jaime de Gusmao, 1226 - Centro, Rio Verde",
-        "6436131313", "", Icons.Default.MedicalServices, "Farmácias"),
-    Partner("Droga Nunes", "17% originais / 40% genéricos / 15% perfumaria",
-        "R. 06, esq. 05, 159 - Bairro Promissão, Rio Verde",
-        "6498406-0533", "6498406-0533", Icons.Default.MedicalServices, "Farmácias"),
-    Partner("Drogaria União", "16% à vista em dinheiro (exceto promoções)",
-        "R. 11, 420 - Bairro Promissão, Rio Verde",
-        "6436216161", "6498455-7398", Icons.Default.MedicalServices, "Farmácias"),
-    Partner("Farmácia Artesanal", "25% de desconto",
-        "Av. Barrinha, Qd. 03, Lt. 04, 536 - Jd. Bela Vista, Rio Verde",
-        "6436121076", "6499937-2244", Icons.Default.MedicalServices, "Farmácias"),
-    Partner("Drogaria Cristo Redentor", "Genérico 20-80% / Eticos 20% / Perfumaria 20%",
-        "R. Vitoria, Qd. 35, Lt. 32 - Dom Miguel, Rio Verde",
-        "6436211062", "6498441-7929", Icons.Default.MedicalServices, "Farmácias"),
-
-    // EQUIPAMENTOS HOSPITALARES
-    Partner("Med Shop", "5% a 15% à vista",
-        "R. Prof. Joaquim Pedro esq. R. Rui Barbosa, 55 - Centro, Rio Verde",
-        "6436215155", "6498180-5156", Icons.Default.LocalHospital, "Saúde"),
-    Partner("R & T Equipamentos", "5% a 15% à vista",
-        "R. Rosulino Ferreira Guimarães, 800 - Centro, Rio Verde",
-        "6436214896", "6498180-4896", Icons.Default.LocalHospital, "Saúde"),
-    Partner("LOCCENTER", "15% no aluguel de produtos hospitalares",
-        "R. Augusta Bastos, 730 - Centro, Rio Verde",
-        "6436133782", "6499277-9718", Icons.Default.LocalHospital, "Saúde"),
-
-    // ESCOLAS
-    Partner("Colégio Educar", "30% nas mensalidades",
-        "R. Doze de Outubro, 42 - Jardim Adriana, Rio Verde",
-        "6436242638", "", Icons.Default.School, "Educação"),
-
-    // ESTETICA
-    Partner("Solaris Conceito em Estética", "15% a 70% à vista/pix/débito",
-        "R. Rui Barbosa, 1261 - Centro, Rio Verde",
-        "6432127473", "6432127473", Icons.Default.Spa, "Estética"),
-
-    // FISIOTERAPIA
-    Partner("Andressa Pamplona Felipe", "10% nas sessões (Fisioterapia Obstétrica)",
-        "R. Nizo Jaime de Gusmao, 369, Rio Verde",
-        "6499292-7760", "6499292-7760", Icons.Default.SelfImprovement, "Fisioterapia"),
-    Partner("Cristiane Silva Viana - Fisiovita", "40% à vista",
-        "R. 72, 500 - Bairro Popular, Rio Verde",
-        "6436222978", "", Icons.Default.SelfImprovement, "Fisioterapia"),
-    Partner("Thaynara Goncalves da Silva", "20% consultas e sessões (Neurológica)",
-        "Atendimento domiciliar, Rio Verde",
-        "6499322-1446", "6499322-1446", Icons.Default.SelfImprovement, "Fisioterapia"),
-    Partner("Eucimar Vieira - Clinica Fisio Rio", "40% à vista",
-        "R. Ana Mota, 813 - Santo Agostinho, Rio Verde",
-        "6436134954", "", Icons.Default.SelfImprovement, "Fisioterapia"),
-    Partner("DR. SANDRINO ALVES FERNANDES CARRIJO", "20% de desconto (Atendimento Domiciliar)",
-        "Atendimento Domiciliar, Rio Verde",
-        "64981263525", "64981263525", Icons.Default.SelfImprovement, "Fisioterapia"),
-    Partner("DRA. MARIA FERNANDA PARREIRA ALVES", "25% de desconto (A Domicílio)",
-        "Atendimento a Domicílio, Rio Verde",
-        "64992842921", "64992842921", Icons.Default.SelfImprovement, "Fisioterapia"),
-
-    // FONOAUDIOLOGIA
-    Partner("Larissa Carvalho Ferreira - Fonoaudiologia", "Consulte valores com o parceiro",
-        "R. Nivaldo Ribeiro, 72 (2 andar) - Setor Central, Rio Verde",
-        "6436021010", "6499858289", Icons.Default.RecordVoiceOver, "Clínicas"),
-    Partner("Clínica Bambinos - Fonoaudiologia", "Consulte valores com o parceiro",
-        "R. Abel Pereira de Castro, 1351 - Setor Central, Rio Verde",
-        "6499305-2884", "6499305-2884", Icons.Default.RecordVoiceOver, "Clínicas"),
-
-    // FLORICULTURA
-    Partner("Adonai Floricultura", "15% à vista",
-        "R. Wolney da Costa Martins, 1374 - Residencial Veneza, Rio Verde",
-        "6499226-5869", "6499226-5869", Icons.Default.LocalFlorist, "Floricultura"),
-    Partner("Elli Flores", "10% à vista",
-        "R. Major Oscar Campos, 435 - Jardim Marconal, Rio Verde",
-        "6436130110", "6499675-0110", Icons.Default.LocalFlorist, "Floricultura"),
-
-    // CLINICAS
-    Partner("Clínica Otovive", "22% consultas / 9% a 50% exames",
-        "R. Rosulino Ferreira Guimaraes, 840 - Centro, Rio Verde",
-        "556484037105", "", Icons.Default.LocalHospital, "Clínicas"),
-    Partner("Clínica Radiológica", "Descontos em exames de imagem",
-        "R. Major Oscar Campos, 159 - Setor Central, Rio Verde",
-        "556484037105", "", Icons.Default.LocalHospital, "Clínicas"),
-    Partner("Day Medical Center", "Descontos em exames de imagem",
-        "Alameda Barrinha, 1800 - Vila Modelo, Rio Verde",
-        "6430515800", "", Icons.Default.LocalHospital, "Clínicas"),
-    Partner("Hospital do Cancer de Rio Verde", "Desconto em Mamografia, Raio X, Ultrassom e Fisioterapia",
-        "R. Tiradentes, 822 - Bairro Santo Agostinho, Rio Verde",
-        "6436122400", "", Icons.Default.LocalHospital, "Clínicas"),
-    Partner("MedSaúde Clínica Odontológica", "Preços acessíveis para associados Pax",
-        "Rio Verde - GO",
-        "6436203110", "6499338-6180", Icons.Default.LocalHospital, "Clínicas"),
-    Partner("ALERGO VACINAS", "Até 10% de desconto",
-        "R. Nizo Jaime de Gusmão, 1200 - Centro, Rio Verde - GO, 75901-240",
-        "6436132828", "", Icons.Default.LocalHospital, "Clínicas"),
-
-    // LABORATORIOS
-    Partner("Laboratório Rio Verde", "10% a 70% de desconto",
-        "R. Joaquim Vaz do Nascimento, 154 - Centro (Pax Rio Verde), Rio Verde",
-        "6436130831", "", Icons.Default.Science, "Laboratórios"),
-    Partner("Laboratório Labortest", "Até 50% de desconto",
-        "R. Rosulino Ferreira Guimaraes, 730 - Centro, Rio Verde",
-        "6436111000", "6499116025", Icons.Default.Science, "Laboratórios"),
-    Partner("Laboratório Prolab Biotecnologia", "Até 80% de desconto em exames",
-        "Rio Verde - GO",
-        "6499235-3303", "6499235-3303", Icons.Default.Science, "Laboratórios"),
-
-    // OTICAS
-    Partner("Ótica Laiz", "30% à vista / crédito / crediário",
-        "R. Prof. Jeronimo Ferreira Sobrinho, 576 - Centro, Rio Verde",
-        "6436235878", "", Icons.Default.RemoveRedEye, "Óticas"),
-    Partner("Bella Ótica", "35% à vista / débito / crédito",
-        "Av. Presidente Vargas, 271 - Centro, Rio Verde",
-        "6436133296", "6498406-6287", Icons.Default.RemoveRedEye, "Óticas"),
-    Partner("Ótica 99", "15% em todas as lentes",
-        "Av. Presidente Vargas, 444 - Jardim Goias, Rio Verde",
-        "6499950-9990", "6499950-9990", Icons.Default.RemoveRedEye, "Óticas"),
-
-    // PSICOLOGIA
-    Partner("Alisson Luiz Quiste - Clinica Ativamente", "Dependência Química / Saúde Mental / TCC",
-        "R. Pau-Brasil, Qd. 23, Lt. 553 - Res. Gameleira, Rio Verde",
-        "6430513639", "", Icons.Default.Psychology, "Psicologia"),
-    Partner("Mayra Miranda Castro - Clinica Ativamente", "TCC em Esquemas / Neuropsicologia",
-        "R. Pau-Brasil, Qd. 23, Lt. 553 - Res. Gameleira, Rio Verde",
-        "6430509977", "", Icons.Default.Psychology, "Psicologia"),
-    Partner("Bruna Lima Dias - Psicanalise", "Terapia de Casal, Crianças e Adolescentes (online)",
-        "Atendimento online",
-        "6499261-8285", "6499261-8285", Icons.Default.Psychology, "Psicologia"),
-    Partner("Daguima da Costa - Clinica Contato", "Gestalt",
-        "R. Joaquim Fonseca, 256 - B. Odilia, Rio Verde",
-        "6436234073", "", Icons.Default.Psychology, "Psicologia"),
-    Partner("Luciana da Silva Cerqueira", "Psicologia Infantil / TCC",
-        "Av. Presidente Vargas, 2223 - Shopping Pop Reis, Rio Verde",
-        "6496477674", "6496477674", Icons.Default.Psychology, "Psicologia"),
-    Partner("Fernanda Cristina de Brito - Contato", "TCC (35 a 55 anos)",
-        "R. Joaquim Fonseca, 256 - Bairro Odilia, Rio Verde",
-        "6436234073", "", Icons.Default.Psychology, "Psicologia"),
-    Partner("Fyama Cabral - Clinica Integra", "Terapia de Casais / Transtornos Mentais",
-        "R. Nizo Jaime de Gusmao, 521 - Bairro Maristela, Rio Verde",
-        "6499224-1228", "6499224-1228", Icons.Default.Psychology, "Psicologia"),
-    Partner("Isabela Gonzaga Ferreira - Contato", "Gestalt",
-        "R. Joaquim Fonseca, 256 - Bairro Odilia, Rio Verde",
-        "6436234073", "", Icons.Default.Psychology, "Psicologia"),
-    Partner("Jaqueline Paiva Souto Lima", "Psicologia Clinica / TCC",
-        "R. Joaquim Fonseca, 256 - Bairro Odilia, Rio Verde",
-        "6499237-4725", "6499237-4725", Icons.Default.Psychology, "Psicologia"),
-    Partner("Synara Carvalho Branquinho - Contato", "Gestalt",
-        "R. Joaquim Fonseca, 256 - Bairro Odilia, Rio Verde",
-        "6436234073", "", Icons.Default.Psychology, "Psicologia"),
-    Partner("Synnara Pereira de Souza Azevedo - Sapiens", "Adultos, Adolescentes, Crianças, Casais",
-        "R. 15, 205 - Parque dos Buritis, Rio Verde",
-        "6499295-7504", "6499295-7504", Icons.Default.Psychology, "Psicologia"),
-    Partner("Jennifer Guimarães de Moura - Psicologias", "TCC (35 a 55 anos)",
-        "R. Rosulino Ferreira Guimaraes - Parque dos Buritis, Rio Verde",
-        "6499344-7929", "6499344-7929", Icons.Default.Psychology, "Psicologia"),
-    Partner("Joab Silva Souza - Clinica Solaris", "Transtornos Mentais / Ansiedade / Depressão",
-        "R. Rui Barbosa, 1261 - Centro, Rio Verde",
-        "6498113-3890", "6498113-3890", Icons.Default.Psychology, "Psicologia"),
-    Partner("Jesse Silva Cabral - Terapia ABA", "Atendimento online",
-        "Atendimento online",
-        "6499289-5682", "6499289-5682", Icons.Default.Psychology, "Psicologia"),
-    Partner("Maria Beatriz Ribeiro Martins - Psicologia", "R$170,00 COM desconto Pax (Original: R$250,00)",
-        "Rio Verde - GO",
-        "6499341644", "6499341644", Icons.Default.Psychology, "Psicologia"),
-
-    // ROUPAS
-    Partner("Kalangotango", "16% à vista / 10% no cartão (exceto promoções)",
-        "Av. 77, 360 - Bairro Popular, Rio Verde",
-        "6436021734", "", Icons.Default.Checkroom, "Roupas"),
-    Partner("Kalangotango Kids", "16% à vista / 10% no cartão (exceto promoções)",
-        "Av. 77, 360 - Bairro Popular, Rio Verde",
-        "6436125133", "", Icons.Default.Checkroom, "Roupas"),
-
-    // NOVOS PARCEIROS
-    Partner("CHAVEIRO LÔBO 24H", "Desconto de 15% em serviços e produtos",
-        "Rua Joaquim Vaz do Nascimento N°230 Centro, Rio Verde",
-        "64993187787", "64993187787", Icons.Default.Key, "Chaveiro"),
-    Partner("STUDIO MICHELLE CUNHA - Pilates", "Desconto de 10%",
-        "Rua Augusta Bastos N°1128 Setor Central, Rio Verde",
-        "6492297020", "6492297020", Icons.Default.SelfImprovement, "Fitness"),
-    Partner("JR REFRIGERAÇÃO", "Instalação, manutenção, carga de gás, limpeza e higienização de AR CONDICIONADO.\nDesconto de 20%",
-        "Rio Verde - GO",
-        "6492147714", "6492147714", Icons.Default.Build, "Manutenção"),
-
-    // NOVAS PARCERIAS (DOCX)
-    Partner("Disk Gás", "5% de desconto em gás de cozinha",
-        "R. Rio Verde, 240 - Vila Maria, Rio Verde",
-        "6492551080", "6492551080", Icons.Default.LocalGasStation, "Gás"),
-    Partner("Corpus Suplementos Nutricionais", "15% de desconto em todos os produtos (Aceitam Vôlus)",
-        "R. Gumercindo Ferreira, 592, Sala C - Centro, Rio Verde",
-        "64999791070", "64999791070", Icons.Default.FitnessCenter, "Fitness"),
-    Partner("Clinica Veterinária Rio Verde", "10% à vista (dinheiro ou pix), 5% (débito) e 3% (crédito) em consulta e cirurgia; 7% à vista (dinheiro ou pix) 5% (débito) e 3% (crédito) em medicações",
-        "R. Rio Verde, 240 - Vila Maria, Rio Verde",
-        "6492554900", "6492554900", Icons.Default.Pets, "Pet"),
-    Partner("Rio Imunne - Clinica de Vacinação", "6% de desconto em todas as vacinas",
-        "R. Abel Pereira de Castro, 709 - Setor Central, Rio Verde",
-        "64992527000", "64992527000", Icons.Default.LocalHospital, "Clínicas"),
-    Partner("Enf. Obstétrica Jéssica Batista de Lacerda", "Taping pós-parto ou cirurgia: R$300 (1 sessão) / R$500 (2 sessões); Laserterapia: R$90 (1 sessão) / R$350 (4 sessões + amamentação)",
-        "Rio Imunne ou à domicílio, Rio Verde",
-        "64996489692", "64996489692", Icons.Default.HealthAndSafety, "Saúde"),
-    Partner("Clínica Sou Coluna", "30% nas consultas (R$175) / 20% nos tratamentos",
-        "Av. Presidente Vargas, 195 - Centro, Rio Verde",
-        "6499644-3222", "6499644-3222", Icons.Default.LocalHospital, "Clínicas"),
-    Partner("CLÍNICA VETERINÁRIA AGRO RAÇA", "5% de desconto no valor total",
-        "Rio Verde - GO",
-        "64992042313", "64992042313", Icons.Default.Pets, "Pet"),
-
-    // MONTIVIDIU
-    Partner("Clínica CMD", "10% a 40% em toda a clínica",
-        "R. Carlos Barromeu, 595, Qd. 17, Lt. 05 - Centro, Montividiu",
-        "6436291930", "", Icons.Default.LocalHospital, "Clínicas", "Montividiu"),
-    Partner("Ótica Laiz - Montividiu", "30% à vista / crédito / crediário",
-        "R. Francisco Sales Rocha, Qd. 10, Casa 2, 660 - Centro, Montividiu",
-        "6499145813", "6499145813", Icons.Default.RemoveRedEye, "Óticas", "Montividiu"),
-
-    // APARECIDA DO RIO DOCE
-    Partner("Farmácia Saúde", "5% à vista em genérico e similar",
-        "R. Otildes Luiz, 569 - Centro, Aparecida do Rio Doce",
-        "6436371197", "6498433-3080", Icons.Default.MedicalServices, "Farmácias", "Aparecida do Rio Doce"),
-    Partner("Drogaria Rio Doce", "10% à vista",
-        "R. Odimar Carneiro, 548 - Centro, Aparecida do Rio Doce",
-        "6498425-2772", "6498425-2772", Icons.Default.MedicalServices, "Farmácias", "Aparecida do Rio Doce"),
-
-    // SANTO ANTONIO DA BARRA
-    Partner("Viver Clinica", "20% a 30% à vista",
-        "Av. Brasilia, 828 - Centro, Santo Antônio da Barra",
-        "6436261259", "6499325-3992", Icons.Default.LocalHospital, "Clínicas", "Santo Antônio da Barra"),
-    Partner("Drogamerica", "10% à vista",
-        "Av. Brasilia, Qd. 36, Lt. 09 - Centro, Santo Antônio da Barra",
-        "6499306-8391", "6499306-8391", Icons.Default.MedicalServices, "Farmácias", "Santo Antônio da Barra"),
-)
+@Composable
+fun highlightText(fullText: String, query: String, highlightColor: Color): AnnotatedString {
+    if (query.isEmpty()) return AnnotatedString(fullText)
+    
+    return buildAnnotatedString {
+        var start = 0
+        while (start < fullText.length) {
+            val index = fullText.indexOf(query, start, ignoreCase = true)
+            if (index == -1) {
+                append(fullText.substring(start))
+                break
+            }
+            append(fullText.substring(start, index))
+            withStyle(SpanStyle(background = highlightColor.copy(alpha = 0.2f), fontWeight = FontWeight.Black)) {
+                append(fullText.substring(index, index + query.length))
+            }
+            start = index + query.length
+        }
+    }
+}
 
 // ─────────────────────────────────────────
 // TELA PRINCIPAL
 // ─────────────────────────────────────────
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun BenefitsScreen(onBack: () -> Unit) {
-    val uriHandler = LocalUriHandler.current
-    var selectedCategory by remember { mutableStateOf("Todos") }
-    var selectedCity     by remember { mutableStateOf("Todas") }
-    var searchQuery      by remember { mutableStateOf("") }
+fun BenefitsScreen(
+    onBack: () -> Unit,
+    idcliente: Int = 0,
+    isDependent: Boolean = false,
+    userName: String? = null,
+    viewModel: BenefitsViewModel = koinViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val walletCache: WalletCache = koinInject()
+    val scope = rememberCoroutineScope()
+    
+    var expandedCard by remember { mutableStateOf<CartaoItem?>(null) }
+
+    val filteredCards = remember(walletCache.cartoesList, isDependent, userName) {
+        val list = walletCache.cartoesList
+        if (isDependent && userName != null) {
+            val normalizedUser = userName.trim().lowercase()
+            list.filter { card ->
+                val cardName = (if (card.dep == "S") card.nomeDependente else card.nomeCliente)?.trim()?.lowercase()
+                card.dep == "S" && cardName == normalizedUser
+            }
+        } else {
+            list
+        }
+    }
+    
+    val listState = rememberLazyListState()
+    
+    // Senior UX: Estado para o botão Voltar ao Topo
+    val showBackToTop by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 2
+        }
+    }
+
+    // Controle Senior: Evita que a animação de cascata rode a cada scroll, 
+    // o que causava o "pulo" na lista ao subir.
+    var animateItems by rememberSaveable { mutableStateOf(true) }
+    
+    LaunchedEffect(Unit) {
+        // Senior Performance: Sincronização com animação de slide (300ms) + margem
+        kotlinx.coroutines.delay(350)
+        viewModel.setReady()
+        
+        if (animateItems) {
+            kotlinx.coroutines.delay(1150) // Ciclo total de 1.5s
+            animateItems = false
+        }
+    }
 
     val cities = listOf("Todas", "Rio Verde", "Montividiu", "Aparecida do Rio Doce", "Santo Antônio da Barra")
 
-    val filteredPartners: List<Partner> = remember(selectedCategory, selectedCity, searchQuery) {
-        realPartners.filter { p ->
-            val catOk  = selectedCategory == "Todos" || p.category == selectedCategory
-            val cityOk = selectedCity == "Todas"    || p.city == selectedCity
-            val searchOk = searchQuery.isEmpty() ||
-                    p.name.contains(searchQuery, ignoreCase = true) ||
-                    p.category.contains(searchQuery, ignoreCase = true) ||
-                    p.discount.contains(searchQuery, ignoreCase = true)
-            catOk && cityOk && searchOk
+    LaunchedEffect(idcliente) {
+        if (idcliente != 0) {
+            walletCache.preLoad(idcliente)
+        }
+    }
+
+    LaunchedEffect(uiState.selectedCategory, uiState.selectedCity) {
+        if (uiState.isReady) {
+            listState.animateScrollToItem(0) 
         }
     }
 
     Scaffold(
         containerColor = Forest50,
-        topBar = { BenefitsTopBar(onBack) }
+        floatingActionButton = {
+            AnimatedVisibility(
+                visible = showBackToTop,
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut()
+            ) {
+                FloatingActionButton(
+                    onClick = {
+                        scope.launch {
+                            listState.animateScrollToItem(0)
+                        }
+                    },
+                    containerColor = Amber500,
+                    contentColor = Color.White,
+                    shape = CircleShape,
+                    modifier = Modifier.padding(bottom = 16.dp, end = 16.dp)
+                ) {
+                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Voltar ao topo")
+                }
+            }
+        }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.padding(padding),
-            contentPadding = PaddingValues(bottom = 32.dp)
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 32.dp + padding.calculateBottomPadding())
         ) {
-            item { HeroBanner() }
-
             item {
-                CityFilterRow(
-                    cities = cities,
-                    selectedCity = selectedCity,
-                    onCitySelected = { selectedCity = it }
+                BenefitsHeader(
+                    partnerCount = realPartners.size,
+                    onBack = onBack,
+                    cards = filteredCards.take(3),
+                    isLoadingCards = walletCache.isPreloading && filteredCards.isEmpty(),
+                    onCardClick = { expandedCard = it }
                 )
             }
 
-            item {
-                BenefitsCategoryFilterRow(
-                    categories = benefitsCategories,
-                    selectedCategory = selectedCategory,
-                    onCategorySelected = { selectedCategory = it }
-                )
-            }
-
-            item {
-                SearchBarRow(
-                    query = searchQuery,
-                    onQueryChange = { searchQuery = it }
-                )
+            // Senior UX: Sticky Header para Busca e Filtros
+            stickyHeader {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Forest50,
+                    shadowElevation = 8.dp // Senior UX: Sombra sutil ao ficar fixo
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding() // Senior Fix: Evita overlap com ícones do sistema
+                            .padding(bottom = 8.dp)
+                    ) {
+                        SearchBarRow(
+                            query = uiState.searchQuery,
+                            onQueryChange = { viewModel.onSearchQueryChange(it) }
+                        )
+                        
+                        CityFilterRow(
+                            cities = cities,
+                            selectedCity = uiState.selectedCity,
+                            onCitySelected = { viewModel.onCitySelected(it) }
+                        )
+                        
+                        BenefitsCategoryFilterRow(
+                            categories = benefitsCategories,
+                            selectedCategory = uiState.selectedCategory,
+                            onCategorySelected = { viewModel.onCategorySelected(it) }
+                        )
+                    }
+                }
             }
 
             item {
                 BenefitsSectionHeader(
-                    title = if (selectedCategory == "Todos") "Todos os parceiros" else selectedCategory,
-                    subtitle = if (selectedCity == "Todas") "Todas as cidades" else selectedCity,
-                    count = filteredPartners.size
+                    title = if (uiState.selectedCategory == "Todos") "Todos os parceiros" else uiState.selectedCategory,
+                    subtitle = if (uiState.selectedCity == "Todas") "Todas as cidades" else uiState.selectedCity,
+                    count = uiState.filteredPartners.size
                 )
             }
 
-            if (filteredPartners.isEmpty()) {
-                item { BenefitsEmptyState(selectedCategory) }
+            if (!uiState.isReady) {
+                items(3) { PartnerSkeleton() }
+            } else if (uiState.filteredPartners.isEmpty()) {
+                item { BenefitsEmptyState(uiState.selectedCategory) }
             } else {
-                items(filteredPartners) { partner ->
-                    PartnerCard(partner)
+                itemsIndexed(
+                    items = uiState.filteredPartners,
+                    key = { _, p -> p.id },
+                    contentType = { _, _ -> "partner" }
+                ) { index, partner ->
+                    AnimatedPartnerCard(
+                        index = index, 
+                        partner = partner,
+                        shouldAnimate = animateItems,
+                        searchQuery = uiState.searchQuery
+                    )
                 }
             }
 
             item { BenefitsLegalDisclaimer() }
         }
     }
+
+    if (expandedCard != null) {
+        QuickCardDialog(
+            item = expandedCard!!,
+            onDismiss = { expandedCard = null }
+        )
+    }
 }
 
 // ─────────────────────────────────────────
-// BARRA DE BUSCA
+// HEADER UNIFICADO (ELITE)
 // ─────────────────────────────────────────
 @Composable
-fun SearchBarRow(
-    query: String,
-    onQueryChange: (String) -> Unit
+fun BenefitsHeader(
+    partnerCount: Int,
+    onBack: () -> Unit,
+    cards: List<CartaoItem> = emptyList(),
+    isLoadingCards: Boolean = false,
+    onCardClick: (CartaoItem) -> Unit = {}
 ) {
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        placeholder = { Text("Buscar parceiro ou serviço...", fontSize = 14.sp, color = Slate500) },
-        leadingIcon = { Icon(Icons.Default.Search, null, tint = Forest600) },
-        trailingIcon = {
-            if (query.isNotEmpty()) {
-                IconButton(onClick = { onQueryChange("") }) {
-                    Icon(Icons.Default.Close, null, tint = Slate500)
-                }
-            }
-        },
-        shape = RoundedCornerShape(12.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Forest600,
-            unfocusedBorderColor = Slate200,
-            focusedContainerColor = Color.White,
-            unfocusedContainerColor = Color.White,
-            focusedTextColor = Slate800,
-            unfocusedTextColor = Slate800
-        ),
-        singleLine = true
-    )
-}
-
-// ─────────────────────────────────────────
-// TOP BAR
-// ─────────────────────────────────────────
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun BenefitsTopBar(onBack: () -> Unit) {
-    TopAppBar(
-        title = {
-            Column {
-                Text("Clube de Vantagens",
-                    fontWeight = FontWeight.ExtraBold, fontSize = 17.sp, color = Color.White)
-                Text("Pax Rio Verde",
-                    fontSize = 11.sp, color = Color.White.copy(alpha = 0.7f))
-            }
-        },
-        navigationIcon = {
+            .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+            .background(Brush.verticalGradient(listOf(Forest800, Forest600)))
+            .statusBarsPadding()
+    ) {
+        // TopBar Integrada
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar", tint = Color.White)
             }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = Forest800)
-    )
-}
-
-// ─────────────────────────────────────────
-// HERO BANNER
-// ─────────────────────────────────────────
-@Composable
-fun HeroBanner() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Brush.linearGradient(listOf(Forest800, Forest600)))
-            .padding(horizontal = 20.dp, vertical = 20.dp)
-    ) {
-        Column {
-            Text("${realPartners.size}", fontSize = 52.sp, fontWeight = FontWeight.Black,
-                color = Color.White.copy(alpha = 0.12f))
-            Text("parceiros com", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f),
-                modifier = Modifier.offset(y = (-12).dp))
-            Text("descontos exclusivos", fontSize = 20.sp, fontWeight = FontWeight.Bold,
-                color = Color.White, modifier = Modifier.offset(y = (-12).dp))
-            Spacer(Modifier.height(4.dp))
-            Surface(color = Color.White.copy(alpha = 0.15f), shape = RoundedCornerShape(6.dp)) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Apresente seu cartão Pax e economize",
-                    fontSize = 12.sp, color = Color.White,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    "Clube de Vantagens",
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 18.sp,
+                    color = Color.White
+                )
+                Text(
+                    "Pax Rio Verde",
+                    fontSize = 12.sp,
+                    color = Color.White.copy(alpha = 0.7f)
                 )
             }
+        }
+
+        // Hero Content com QuickCard Stack
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1.1f)) {
+                Text(
+                    partnerCount.toString(),
+                    fontSize = 64.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White.copy(alpha = 0.15f),
+                    modifier = Modifier.offset(x = (-4).dp, y = 8.dp)
+                )
+                Text(
+                    "parceiros com",
+                    fontSize = 14.sp,
+                    color = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier.offset(y = (-16).dp)
+                )
+                Text(
+                    "descontos exclusivos",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.offset(y = (-18).dp)
+                )
+                Surface(
+                    color = Color.White.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.offset(y = (-8).dp)
+                ) {
+                    Text(
+                        text = "Apresente seu cartão",
+                        fontSize = 11.sp,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+            }
+            
+            // Stack de Cartões
+            if (cards.isNotEmpty() || isLoadingCards) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 12.dp),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    if (isLoadingCards) {
+                        QuickCardSkeleton()
+                    } else {
+                        QuickCardStack(
+                            cards = cards,
+                            onClick = { onCardClick(it) }
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+/**
+ * Skeleton para o Stack de Cartões em carregamento
+ */
+@Composable
+fun QuickCardSkeleton() {
+    Box(
+        modifier = Modifier
+            .width(170.dp)
+            .height(110.dp),
+        contentAlignment = Alignment.CenterEnd
+    ) {
+        repeat(2) { index ->
+            val visualIndex = 1 - index
+            val offsetX = (visualIndex * 20).dp
+            val offsetY = (visualIndex * -12).dp
+            val rotation = 10f - (visualIndex * 4f)
+            
+            Box(
+                modifier = Modifier
+                    .offset(x = -offsetX, y = offsetY)
+                    .width(120.dp)
+                    .aspectRatio(1.586f)
+                    .rotate(rotation)
+                    .clip(RoundedCornerShape(10.dp))
+                    .shimmerEffect()
+            )
         }
     }
 }
 
 // ─────────────────────────────────────────
-// FILTRO CIDADES
+// QUICK CARD STACK (ELITE)
+// ─────────────────────────────────────────
+@Composable
+fun QuickCardStack(cards: List<CartaoItem>, onClick: (CartaoItem) -> Unit) {
+    Box(
+        modifier = Modifier
+            .width(170.dp)
+            .height(110.dp),
+        contentAlignment = Alignment.CenterEnd
+    ) {
+        val displayedCards = cards.take(3)
+        displayedCards.asReversed().forEachIndexed { index, item ->
+            val visualIndex = (displayedCards.size - 1) - index
+            val offsetX = (visualIndex * 20).dp
+            val offsetY = (visualIndex * -12).dp
+            val rotation = 10f - (visualIndex * 4f)
+            
+            Box(
+                modifier = Modifier
+                    .offset(x = -offsetX, y = offsetY)
+                    .width(120.dp)
+                    .aspectRatio(1.586f)
+                    .rotate(rotation)
+                    .shadow(
+                        elevation = if (visualIndex == 0) 12.dp else 4.dp,
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.White)
+                    .clickable { onClick(item) }
+            ) {
+                CardMiniContent(item)
+            }
+        }
+    }
+}
+
+@Composable
+fun CardMiniContent(item: CartaoItem) {
+    val sessionManager: SessionManager = koinInject()
+    val style = sessionManager.getCardStyle(item.idControle) ?: item.tipo
+    val lowerTipo = style.lowercase()
+    
+    val backgroundResource = when {
+        lowerTipo.contains("kids") -> Res.drawable.card_kids
+        lowerTipo.contains("teen") -> Res.drawable.card_teen
+        else -> Res.drawable.card_titular
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(backgroundResource),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.FillBounds
+        )
+        
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .fillMaxHeight(0.35f)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
+                    )
+                )
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            contentAlignment = Alignment.BottomStart
+        ) {
+            Column {
+                Text(
+                    text = formatCardName(if (item.dep == "S") item.nomeDependente ?: "" else item.nomeCliente),
+                    color = Color.White,
+                    fontSize = 7.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    letterSpacing = 0.3.sp
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = item.dtValidade,
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 6.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Surface(
+                        color = Color.White.copy(alpha = 0.15f),
+                        shape = CircleShape
+                    ) {
+                        Text(
+                            text = if (item.dep == "S") "DEP" else "TITULAR",
+                            color = Color.White,
+                            fontSize = 5.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun QuickCardDialog(item: CartaoItem, onDismiss: () -> Unit) {
+    val sessionManager: SessionManager = koinInject()
+    val style = sessionManager.getCardStyle(item.idControle) ?: item.tipo
+    val lowerTipo = style.lowercase()
+    
+    val backgroundResource = when {
+        lowerTipo.contains("kids") -> Res.drawable.card_kids
+        lowerTipo.contains("teen") -> Res.drawable.card_teen
+        else -> Res.drawable.card_titular
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.85f))
+                .clickable { onDismiss() },
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(24.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1.586f)
+                        .shadow(24.dp, RoundedCornerShape(20.dp))
+                ) {
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            Image(
+                                painter = painterResource(backgroundResource),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.FillBounds
+                            )
+                            
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.Bottom
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(
+                                            Brush.verticalGradient(
+                                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
+                                            )
+                                        )
+                                        .padding(horizontal = 24.dp, vertical = 16.dp)
+                                ) {
+                                    Column {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            val rawName = if (item.dep == "S") item.nomeDependente ?: "" else item.nomeCliente
+                                            Text(
+                                                text = formatCardName(rawName),
+                                                color = Color.White,
+                                                fontSize = 16.sp,
+                                                fontWeight = FontWeight.Black,
+                                                letterSpacing = 1.sp
+                                            )
+                                            Surface(
+                                                color = Amber500,
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (item.dep == "S") "DEPENDENTE" else "TITULAR",
+                                                    color = Color.Black,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Black,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                        
+                                        Spacer(Modifier.height(4.dp))
+                                        
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = "CONTRATO: ${item.idContrato ?: ""}",
+                                                color = Color.White.copy(alpha = 0.7f),
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = "VALIDADE: ${item.dtValidade}",
+                                                color = Color.White,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.ExtraBold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(Modifier.height(32.dp))
+                
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = Amber500),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().height(50.dp)
+                ) {
+                    Text("FECHAR", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SearchBarRow(
+    query: String,
+    onQueryChange: (String) -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .shadow(2.dp, RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White
+    ) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Buscar parceiro ou serviço...", fontSize = 14.sp, color = Slate500) },
+            leadingIcon = { Icon(Icons.Default.Search, null, tint = Forest600) },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(Icons.Default.Close, null, tint = Slate500)
+                    }
+                }
+            },
+            shape = RoundedCornerShape(16.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color.Transparent,
+                unfocusedBorderColor = Color.Transparent,
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+                focusedTextColor = Slate800,
+                unfocusedTextColor = Slate800
+            ),
+            singleLine = true
+        )
+    }
+}
+
+
+// ─────────────────────────────────────────
+// FILTRO CIDADES (ELITE)
 // ─────────────────────────────────────────
 @Composable
 fun CityFilterRow(
@@ -591,34 +720,34 @@ fun CityFilterRow(
     onCitySelected: (String) -> Unit
 ) {
     LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.background(Forest800.copy(alpha = 0.9f))
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
         items(cities) { city ->
             val isSelected = selectedCity == city
-            FilterChip(
-                selected = isSelected,
-                onClick = { onCitySelected(city) },
-                label = {
-                    Text(city, fontSize = 12.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Amber500,
-                    selectedLabelColor = Color.White,
-                    containerColor = Color.White.copy(alpha = 0.12f),
-                    labelColor = Color.White
-                ),
-                border = null,
-                shape = RoundedCornerShape(20.dp)
-            )
+            Surface(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onCitySelected(city) },
+                color = if (isSelected) Amber500 else Forest600.copy(alpha = 0.05f),
+                shape = RoundedCornerShape(12.dp),
+                border = if (!isSelected) BorderStroke(1.dp, Forest600.copy(alpha = 0.1f)) else null
+            ) {
+                Text(
+                    city,
+                    fontSize = 12.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) Color.White else Forest600,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
         }
     }
 }
 
 // ─────────────────────────────────────────
-// FILTRO CATEGORIAS
+// FILTRO CATEGORIAS (ELITE)
 // ─────────────────────────────────────────
 @Composable
 fun BenefitsCategoryFilterRow(
@@ -627,37 +756,43 @@ fun BenefitsCategoryFilterRow(
     onCategorySelected: (String) -> Unit
 ) {
     LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.background(Forest800)
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
         items(categories) { cat ->
             val isSelected = selectedCategory == cat.label
-            FilterChip(
-                selected = isSelected,
-                onClick = { onCategorySelected(cat.label) },
-                label = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(cat.icon, null, modifier = Modifier.size(14.dp))
-                        Text(cat.label, fontSize = 13.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
-                    }
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Color.White,
-                    selectedLabelColor = Forest600,
-                    containerColor = Color.White.copy(alpha = 0.12f),
-                    labelColor = Color.White
-                ),
-                border = null,
-                shape = RoundedCornerShape(20.dp)
-            )
+            Surface(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onCategorySelected(cat.label) },
+                color = if (isSelected) cat.color else Color.White,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, if (isSelected) cat.color else Slate200)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        cat.icon,
+                        null,
+                        modifier = Modifier.size(16.dp),
+                        tint = if (isSelected) Color.White else cat.color
+                    )
+                    Text(
+                        cat.label,
+                        fontSize = 13.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) Color.White else Slate800
+                    )
+                }
+            }
         }
     }
 }
+
 
 // ─────────────────────────────────────────
 // SECTION HEADER
@@ -681,138 +816,225 @@ fun BenefitsSectionHeader(title: String, subtitle: String, count: Int) {
 }
 
 // ─────────────────────────────────────────
-// PARTNER CARD
+// PARTNER CARD (ELITE)
 // ─────────────────────────────────────────
 @Composable
-fun PartnerCard(partner: Partner) {
+fun AnimatedPartnerCard(index: Int, partner: Partner, shouldAnimate: Boolean, searchQuery: String = "") {
+    if (!shouldAnimate) {
+        PartnerCard(partner, searchQuery)
+        return
+    }
+
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(partner.id) {
+        kotlinx.coroutines.delay((index % 10 * 30).milliseconds)
+        visible = true
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(400)) + slideInVertically(
+            initialOffsetY = { 40 },
+            animationSpec = tween(400)
+        )
+    ) {
+        PartnerCard(partner, searchQuery)
+    }
+}
+
+/**
+ * Skeleton para carregamento inicial ultra-rápido da lista
+ */
+@Composable
+fun PartnerSkeleton() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .height(110.dp)
+            .clip(RoundedCornerShape(20.dp)),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(modifier = Modifier.size(60.dp).clip(RoundedCornerShape(16.dp)).shimmerEffect())
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Box(modifier = Modifier.width(150.dp).height(18.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+                Spacer(Modifier.height(8.dp))
+                Box(modifier = Modifier.width(100.dp).height(14.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+            }
+        }
+    }
+}
+
+@Composable
+fun PartnerCard(partner: Partner, searchQuery: String = "") {
     val uriHandler = LocalUriHandler.current
     var expanded by remember { mutableStateOf(false) }
+
+    val categoryColor = remember(partner.category) {
+        benefitsCategories.find { it.label == partner.category }?.color ?: Forest600
+    }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) { expanded = !expanded },
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .clickable { expanded = !expanded }
+            .animateContentSize(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)), // Senior UX: Expansão suave
         colors    = CardDefaults.cardColors(containerColor = CardWhite),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape     = RoundedCornerShape(14.dp)
+        shape     = RoundedCornerShape(20.dp)
     ) {
         Column {
-            // ── Linha principal ──────────────────────
             Row(
-                modifier = Modifier.padding(14.dp).height(IntrinsicSize.Min),
+                modifier = Modifier
+                    .padding(16.dp)
+                    .height(IntrinsicSize.Min),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Forest600.copy(alpha = 0.08f)),
+                        .size(60.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(categoryColor.copy(alpha = 0.08f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(partner.icon, null, tint = Forest600, modifier = Modifier.size(26.dp))
+                    Icon(partner.icon, null, tint = categoryColor, modifier = Modifier.size(28.dp))
                 }
 
-                Spacer(Modifier.width(14.dp))
+                Spacer(Modifier.width(16.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(partner.name, fontWeight = FontWeight.Bold, fontSize = 14.sp,
-                        color = Slate800, maxLines = if (expanded) Int.MAX_VALUE else 1, overflow = TextOverflow.Ellipsis)
-                    Spacer(Modifier.height(3.dp))
-                    Surface(color = Amber50, shape = RoundedCornerShape(5.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = partner.discount,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = Amber500,
-                            maxLines = if (expanded) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis
+                            text = highlightText(partner.name, searchQuery, categoryColor),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = Slate800,
+                            modifier = Modifier.weight(1f),
+                            maxLines = if (expanded) Int.MAX_VALUE else 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Surface(
+                            color = categoryColor.copy(alpha = 0.08f),
+                            shape = CircleShape,
+                            modifier = Modifier.padding(start = 4.dp)
+                        ) {
+                            Text(
+                                partner.category,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = categoryColor,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                    
+                    Spacer(Modifier.height(6.dp))
+                    
+                    Surface(
+                        color = categoryColor.copy(alpha = 0.04f),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, categoryColor.copy(alpha = 0.1f))
+                    ) {
+                        Text(
+                            text = highlightText(partner.discount, searchQuery, categoryColor),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = categoryColor,
+                            maxLines = if (expanded) Int.MAX_VALUE else 2,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Spacer(Modifier.height(3.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.LocationOn, null, tint = Slate500,
-                            modifier = Modifier.size(12.dp))
-                        Spacer(Modifier.width(2.dp))
-                        Text(partner.address, fontSize = 11.sp, color = Slate500,
-                            maxLines = if (expanded) Int.MAX_VALUE else 1, overflow = TextOverflow.Ellipsis)
+                    
+                    if (partner.id != "p116") {
+                        Spacer(Modifier.height(6.dp))
+                        
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.LocationOn,
+                                null,
+                                tint = Slate500,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                partner.address,
+                                fontSize = 11.sp,
+                                color = Slate500,
+                                maxLines = if (expanded) Int.MAX_VALUE else 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
 
-                Icon(
-                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (expanded) "Recolher" else "Ver opções",
-                    tint = Slate500, modifier = Modifier.size(22.dp)
-                )
+                IconButton(onClick = { expanded = !expanded }) {
+                    Icon(
+                        if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        tint = Slate500
+                    )
+                }
             }
 
-            // ── Painel expandido ─────────────────────
-            AnimatedVisibility(visible = expanded) {
+            if (expanded) {
                 Column {
-                    HorizontalDivider(color = Slate200, thickness = 1.dp)
+                    HorizontalDivider(color = Slate200.copy(alpha = 0.5f), thickness = 1.dp)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Ligar
-                        Button(
+                        PartnerActionButton(
+                            icon = Icons.Default.Phone,
+                            label = "Ligar",
+                            color = categoryColor,
                             onClick = {
                                 val clean = partner.phone.replace(Regex("[^0-9]"), "")
                                 uriHandler.openUri("tel:$clean")
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Forest600),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
-                        ) {
-                            Icon(Icons.Default.Phone, null, modifier = Modifier.size(15.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Ligar", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
+                            }
+                        )
 
-                        // WhatsApp — condicional
                         if (partner.whatsapp.isNotBlank()) {
-                            Button(
+                            PartnerActionButton(
+                                icon = Icons.AutoMirrored.Filled.Chat,
+                                label = "Whats",
+                                color = WhatsAppGreen,
+                                isWhatsApp = true,
                                 onClick = {
                                     val clean = partner.whatsapp.replace(Regex("[^0-9]"), "")
                                     val msg = "Olá! Sou associado da Pax Rio Verde e gostaria de saber mais sobre os descontos."
                                     uriHandler.openUri("https://wa.me/55$clean?text=${urlEncode(msg)}")
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen),
-                                shape = RoundedCornerShape(10.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
-                            ) {
-                                Icon(
-                                    painter = painterResource(Res.drawable.ic_whatsapp_social),
-                                    contentDescription = "WhatsApp",
-                                    modifier = Modifier.size(15.dp),
-                                    tint = Color.White
-                                )
-                            }
+                                }
+                            )
                         }
 
-                        // Google Maps
-                        OutlinedButton(
-                            onClick = {
-                                uriHandler.openUri("https://www.google.com/maps/search/?api=1&query=${urlEncode("${partner.name} ${partner.address}")}")
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Forest600),
-                            border = ButtonDefaults.outlinedButtonBorder,
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
-                        ) {
-                            Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(15.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Mapa", fontSize = 12.sp)
+                        if (partner.id != "p116") {
+                            PartnerActionButton(
+                                icon = Icons.Default.Map,
+                                label = "Mapa",
+                                color = Slate500,
+                                isOutlined = true,
+                                onClick = {
+                                    uriHandler.openUri("https://www.google.com/maps/search/?api=1&query=${urlEncode("${partner.name} ${partner.address}")}")
+                                }
+                            )
                         }
-
-                        // Compartilhar
-                        OutlinedButton(
+                        
+                        PartnerActionButton(
+                            icon = Icons.Default.Share,
+                            label = "Enviar",
+                            color = Slate500,
+                            isOutlined = true,
                             onClick = {
                                 val mapsUrl = "https://www.google.com/maps/search/?api=1&query=${urlEncode("${partner.name} ${partner.address}")}"
                                 val shareMsg = """
@@ -826,23 +1048,53 @@ fun PartnerCard(partner: Partner) {
                                     Apresente seu cartão Pax Rio Verde e economize!
                                 """.trimIndent()
                                 shareText(shareMsg, "Compartilhar Parceiro")
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Forest600),
-                            border = ButtonDefaults.outlinedButtonBorder,
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
-                        ) {
-                            Icon(Icons.Default.Share, null, modifier = Modifier.size(15.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Enviar", fontSize = 12.sp)
-                        }
+                            }
+                        )
                     }
                 }
             }
         }
     }
 }
+
+@Composable
+fun PartnerActionButton(
+    icon: ImageVector,
+    label: String,
+    color: Color,
+    isOutlined: Boolean = false,
+    isWhatsApp: Boolean = false,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.height(40.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = if (isOutlined) Color.Transparent else color,
+        border = if (isOutlined) BorderStroke(1.dp, Slate200) else null,
+        contentColor = if (isOutlined) Slate800 else Color.White
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (isWhatsApp) {
+                Icon(
+                    painter = painterResource(Res.drawable.ic_whatsapp_social),
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = Color.White
+                )
+            } else {
+                Icon(icon, null, modifier = Modifier.size(16.dp))
+            }
+            Spacer(Modifier.width(6.dp))
+            Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
 
 // ─────────────────────────────────────────
 // EMPTY STATE

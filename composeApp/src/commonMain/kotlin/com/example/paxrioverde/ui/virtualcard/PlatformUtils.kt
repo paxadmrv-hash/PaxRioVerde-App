@@ -7,3 +7,5 @@ expect suspend fun renderPdfBase64ToBitmap(base64Str: String): ImageBitmap?
 expect fun isCardExpired(validity: String): Boolean
 
 expect fun ImageBitmap.toByteArray(): ByteArray?
+
+expect fun getAppVersionCode(): Int

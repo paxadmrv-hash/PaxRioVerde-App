@@ -2,22 +2,26 @@ package com.example.paxrioverde.ui.login
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
@@ -25,21 +29,26 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.paxrioverde.api.ApiService
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.compose.viewmodel.koinViewModel
+import org.koin.compose.koinInject
 import com.example.paxrioverde.api.LoginResponse
+import com.example.paxrioverde.ui.components.PaxButton
+import com.example.paxrioverde.ui.components.PaxOutlinedButton
+import com.example.paxrioverde.ui.components.bounceClick
+import com.example.paxrioverde.ui.theme.PaxDesignSystem
+import com.example.paxrioverde.util.BiometricAuthenticator
 import com.example.paxrioverde.util.SessionManager
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import paxrioverde.composeapp.generated.resources.Res
 import paxrioverde.composeapp.generated.resources.bg_login_family
 
-val BrandGreen = Color(0xFF386641)
-
-// FORMATAÇÃO DE CPF
 class CpfVisualTransformation : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
         val trimmed = if (text.text.length >= 11) text.text.substring(0..10) else text.text
@@ -74,27 +83,25 @@ class CpfVisualTransformation : VisualTransformation {
 fun LoginScreen(
     onLoginSuccess: (LoginResponse) -> Unit,
     onFirstAccessClick: () -> Unit,
-    onForgotPasswordClick: () -> Unit
+    onForgotPasswordClick: () -> Unit,
+    viewModel: LoginViewModel = koinViewModel()
 ) {
-    val sessionManager = remember { SessionManager() }
-    var cpf by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var rememberMe by remember { mutableStateOf(false) }
-
-    var passwordVisible by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-
-    val scope = rememberCoroutineScope()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
+    val sessionManager = koinInject<SessionManager>()
+    val biometricAuthenticator = koinInject<BiometricAuthenticator>()
+    val authRepository = koinInject<com.example.paxrioverde.domain.repository.AuthRepository>()
 
-    // Carregar dados salvos ao iniciar
+    val density = LocalDensity.current
+    val fontScale = density.fontScale
+    val scrollState = rememberScrollState()
+    
+    var isBiometricAvailable by remember { mutableStateOf(false) }
+    
     LaunchedEffect(Unit) {
-        if (sessionManager.isRememberMeEnabled()) {
-            cpf = sessionManager.getSavedCpf()
-            password = sessionManager.getSavedPassword()
-            rememberMe = true
-        }
+        isBiometricAvailable = sessionManager.isBiometricEnabled() && 
+                             biometricAuthenticator.canAuthenticate() &&
+                             authRepository.hasSavedCredentials()
     }
 
     Box(
@@ -102,7 +109,7 @@ fun LoginScreen(
             .fillMaxSize()
             .clickable(
                 indication = null,
-                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                interactionSource = remember { MutableInteractionSource() }
             ) { focusManager.clearFocus() },
         contentAlignment = Alignment.Center
     ) {
@@ -114,144 +121,167 @@ fun LoginScreen(
         )
 
         Card(
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f)),
-            modifier = Modifier.fillMaxWidth().padding(24.dp)
+            shape = PaxDesignSystem.Shapes.Card,
+            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.92f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
+                .imePadding() // Garante que o teclado não cubra os campos
         ) {
             Column(
-                modifier = Modifier.padding(32.dp),
+                modifier = Modifier
+                    .padding(horizontal = 24.dp, vertical = if (fontScale > 1.3) 16.dp else 32.dp)
+                    .verticalScroll(scrollState),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     text = "Acesse sua conta",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = BrandGreen
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = PaxDesignSystem.Colors.TextDark,
+                    letterSpacing = (-0.5).sp,
+                    overflow = TextOverflow.Ellipsis,
+                    maxLines = 1
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(if (fontScale > 1.3) 12.dp else 24.dp))
 
                 LoginTextField(
-                    value = cpf,
-                    onValueChange = { cpf = it.filter { c -> c.isDigit() }.take(11) },
+                    value = uiState.cpf,
+                    onValueChange = { viewModel.onCpfChange(it) },
                     label = "CPF",
                     icon = Icons.Outlined.Person,
                     keyboardType = KeyboardType.Number,
                     visualTransformation = CpfVisualTransformation()
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(if (fontScale > 1.3) 8.dp else 16.dp))
 
                 LoginTextField(
-                    value = password,
-                    onValueChange = { password = it },
+                    value = uiState.password,
+                    onValueChange = { viewModel.onPasswordChange(it) },
                     label = "Senha",
                     icon = Icons.Outlined.Lock,
                     keyboardType = KeyboardType.Password,
                     isPassword = true,
-                    isPasswordVisible = passwordVisible,
-                    onVisibilityChange = { passwordVisible = !passwordVisible }
+                    isPasswordVisible = uiState.passwordVisible,
+                    onVisibilityChange = { viewModel.togglePasswordVisibility() }
                 )
+
+                if (fontScale > 1.2) {
+                    // Layout vertical para fontes grandes
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable { viewModel.onRememberMeChange(!uiState.rememberMe) }
+                        ) {
+                            Checkbox(
+                                checked = uiState.rememberMe,
+                                onCheckedChange = { viewModel.onRememberMeChange(it) },
+                                colors = CheckboxDefaults.colors(checkedColor = PaxDesignSystem.Colors.BrandGreen)
+                            )
+                            Text(
+                                text = "Lembrar login",
+                                fontSize = 14.sp
+                            )
+                        }
+                        Text(
+                            text = "Esqueci a senha",
+                            fontSize = 14.sp,
+                            color = PaxDesignSystem.Colors.BrandGreen,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .padding(start = 12.dp, top = 4.dp)
+                                .clickable { onForgotPasswordClick() }
+                        )
+                    }
+                } else {
+                    // Layout horizontal padrão
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = uiState.rememberMe,
+                                onCheckedChange = { viewModel.onRememberMeChange(it) },
+                                colors = CheckboxDefaults.colors(checkedColor = PaxDesignSystem.Colors.BrandGreen)
+                            )
+                            Text(
+                                text = "Lembrar login",
+                                fontSize = 14.sp,
+                                modifier = Modifier.clickable { viewModel.onRememberMeChange(!uiState.rememberMe) }
+                            )
+                        }
+                        Text(
+                            text = "Esqueci a senha",
+                            fontSize = 14.sp,
+                            color = PaxDesignSystem.Colors.BrandGreen,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable { onForgotPasswordClick() }
+                        )
+                    }
+                }
+
+                uiState.errorMessage?.let { message ->
+                    LoginErrorCard(
+                        message = message,
+                        suggestFirstAccess = uiState.suggestFirstAccess,
+                        onFirstAccessClick = onFirstAccessClick
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = rememberMe,
-                            onCheckedChange = { rememberMe = it },
-                            colors = CheckboxDefaults.colors(checkedColor = BrandGreen)
-                        )
-                        Text(
-                            text = "Lembrar login",
-                            fontSize = 14.sp,
-                            modifier = Modifier.clickable { rememberMe = !rememberMe }
-                        )
-                    }
-                    Text(
-                        text = "Esqueci a senha",
-                        fontSize = 14.sp,
-                        color = BrandGreen,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable { onForgotPasswordClick() }
+                    PaxButton(
+                        text = "ENTRAR",
+                        onClick = { viewModel.login(onLoginSuccess) },
+                        isLoading = uiState.isLoading,
+                        modifier = Modifier.weight(1f)
                     )
-                }
 
-                if (errorMessage != null) {
-                    Text(
-                        text = errorMessage!!,
-                        color = Color.Red,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Button(
-                    onClick = {
-                        if (cpf.length < 11 || password.isEmpty()) {
-                            errorMessage = "Preencha todos os campos corretamente"
-                            return@Button
-                        }
-                        
-                        isLoading = true
-                        errorMessage = null
-
-                        scope.launch {
-                            try {
-                                val response = ApiService.login(cpf, password)
-                                isLoading = false
-                                if (response.success) {
-                                    // Salvar ou limpar o login conforme o checkbox
-                                    if (rememberMe) {
-                                        sessionManager.setRememberMeEnabled(true)
-                                        sessionManager.saveCpf(cpf)
-                                        sessionManager.savePassword(password)
-                                    } else {
-                                        sessionManager.setRememberMeEnabled(false)
-                                        sessionManager.clearCpf()
-                                        sessionManager.clearPassword()
+                    if (isBiometricAvailable) {
+                        IconButton(
+                            onClick = {
+                                biometricAuthenticator.authenticate(
+                                    title = "Login com Biometria",
+                                    subtitle = "Use sua digital para acessar",
+                                    onSuccess = { viewModel.performBiometricLogin(onLoginSuccess) },
+                                    onError = { error ->
+                                        viewModel.onBiometricError(error)
                                     }
-                                    onLoginSuccess(response)
-                                } else {
-                                    errorMessage = "CPF ou senha inválidos"
-                                }
-                            } catch (e: Exception) {
-                                isLoading = false
-                                errorMessage = "Erro de conexão. Verifique sua internet."
-                                println("Erro login: ${e.message}")
-                            }
+                                )
+                            },
+                            modifier = Modifier
+                                .size(56.dp)
+                                .background(PaxDesignSystem.Colors.BrandGreen.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Fingerprint,
+                                contentDescription = "Biometria",
+                                tint = PaxDesignSystem.Colors.BrandGreen
+                            )
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandGreen),
-                    enabled = !isLoading
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            color = Color.White,
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Text("ENTRAR", fontWeight = FontWeight.Bold)
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                OutlinedButton(
+                PaxOutlinedButton(
+                    text = "PRIMEIRO ACESSO",
                     onClick = onFirstAccessClick,
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, BrandGreen)
-                ) {
-                    Text("PRIMEIRO ACESSO", color = BrandGreen, fontWeight = FontWeight.Bold)
-                }
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -267,7 +297,7 @@ fun LoginScreen(
                         }
                     },
                     fontSize = 14.sp,
-                    color = BrandGreen,
+                    color = PaxDesignSystem.Colors.BrandGreen,
                     modifier = Modifier.clickable {
                         uriHandler.openUri("https://wa.me/556492331101")
                     }
@@ -275,7 +305,6 @@ fun LoginScreen(
             }
         }
 
-        // Assinatura no rodapé (fora do Card para não afetar o layout interno)
         Text(
             text = "© 2026 Pax Rio Verde | Desenvolvido pelo T.I. Interno",
             fontSize = 10.sp,
@@ -283,7 +312,6 @@ fun LoginScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 48.dp)
-                // Removemos o safeDrawingPadding e ignoramos insets do teclado
                 .windowInsetsPadding(WindowInsets.statusBars)
         )
     }
@@ -305,7 +333,7 @@ fun LoginTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
-        leadingIcon = { Icon(icon, null, tint = BrandGreen) },
+        leadingIcon = { Icon(icon, null, tint = PaxDesignSystem.Colors.BrandGreen) },
         trailingIcon = if (isPassword) {
             {
                 IconButton(onClick = onVisibilityChange) {
@@ -327,11 +355,74 @@ fun LoginTextField(
             autoCorrectEnabled = false
         ),
         singleLine = true,
-        shape = RoundedCornerShape(12.dp),
+        shape = PaxDesignSystem.Shapes.Button,
         modifier = Modifier.fillMaxWidth(),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = BrandGreen,
-            focusedLabelColor = BrandGreen
+            focusedBorderColor = PaxDesignSystem.Colors.BrandGreen,
+            focusedLabelColor = PaxDesignSystem.Colors.BrandGreen,
+            unfocusedBorderColor = PaxDesignSystem.Colors.TextSecondary.copy(alpha = 0.2f),
+            unfocusedContainerColor = Color.Transparent,
+            focusedContainerColor = Color.Transparent
         )
     )
+}
+
+@Composable
+fun LoginErrorCard(
+    message: String,
+    suggestFirstAccess: Boolean,
+    onFirstAccessClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp),
+        color = if (suggestFirstAccess) Color(0xFFFFF3E0) else Color(0xFFFFEBEE),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, if (suggestFirstAccess) Color(0xFFFFB74D) else Color(0xFFEF9A9A))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = if (suggestFirstAccess) Icons.Default.Lightbulb else Icons.Default.ErrorOutline,
+                    contentDescription = null,
+                    tint = if (suggestFirstAccess) Color(0xFFE65100) else Color(0xFFC62828),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = message,
+                    color = if (suggestFirstAccess) Color(0xFFE65100) else Color(0xFFC62828),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            if (suggestFirstAccess) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onFirstAccessClick,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE65100)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    Text(
+                        "FAZER PRIMEIRO ACESSO AGORA",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
+        }
+    }
 }

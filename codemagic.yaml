@@ -49,7 +49,7 @@ workflows:
           mkdir -p build/ios/xcarchive
           mkdir -p build/ios/ipa
 
-          echo "🚀 Iniciando build final para Pax Rio Verde..."
+          echo " Iniciando build final para Pax Rio Verde..."
           xcode-project build-ipa \
             -project "$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \

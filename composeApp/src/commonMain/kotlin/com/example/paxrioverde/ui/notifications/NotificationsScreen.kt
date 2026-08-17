@@ -1,11 +1,11 @@
 package com.example.paxrioverde.ui.notifications
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Notifications
@@ -16,20 +16,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.paxrioverde.ui.components.bounceClick
+import com.example.paxrioverde.ui.theme.PaxDesignSystem
+import kotlinx.serialization.Serializable
+import org.koin.compose.viewmodel.koinViewModel
 
-// CORES
-val BrandGreen = Color(0xFF386641)
-val BrandLightGreen = Color(0xFFE8F5E9)
-val TextDark = Color(0xFF1F2937)
-val TextGray = Color(0xFF6B7280)
-val NotificationRed = Color(0xFFD32F2F)
-val NotificationBlue = Color(0xFF1976D2)
+// Senior Theme Integration: Centralizado no PaxDesignSystem
+private val BrandGreen = PaxDesignSystem.Colors.BrandGreen
+private val BrandLightGreen = Color(0xFFE8F5E9)
+private val TextDark = PaxDesignSystem.Colors.TextDark
+private val TextGray = PaxDesignSystem.Colors.TextSecondary
+private val NotificationRed = PaxDesignSystem.Colors.Error
+private val NotificationBlue = Color(0xFF1976D2)
 
 //MODELO
+@Serializable
 data class NotificationItem(
     val id: Int,
     val title: String,
@@ -39,6 +46,7 @@ data class NotificationItem(
     val isRead: Boolean = false
 )
 
+@Serializable
 enum class NotificationType {
     PAYMENT, PROMO, SYSTEM, ALERT
 }
@@ -46,12 +54,13 @@ enum class NotificationType {
 @Composable
 fun NotificationsScreen(
     onBack: () -> Unit,
-    viewModel: NotificationsViewModel = viewModel { NotificationsViewModel() }
+    viewModel: NotificationsViewModel = koinViewModel()
 ) {
     val notifications = viewModel.notifications
+    val haptic = LocalHapticFeedback.current
 
     Scaffold(
-        containerColor = Color(0xFFF7F8FA),
+        containerColor = PaxDesignSystem.Colors.Background,
         topBar = {
             Box(
                 modifier = Modifier
@@ -70,13 +79,21 @@ fun NotificationsScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "Notificações",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextDark
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = TextDark,
+                        letterSpacing = (-0.5).sp
                     )
                     Spacer(modifier = Modifier.weight(1f))
-                    TextButton(onClick = { viewModel.limparNotificacoes() }) {
-                        Text("Limpar", color = BrandGreen, fontWeight = FontWeight.Bold)
+                    if (notifications.isNotEmpty()) {
+                        TextButton(
+                            onClick = { 
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.limparTudo() 
+                            }
+                        ) {
+                            Text("Limpar tudo", color = BrandGreen, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -94,8 +111,14 @@ fun NotificationsScreen(
                     EmptyState()
                 }
             } else {
-                items(notifications) { notification ->
-                    NotificationCard(notification)
+                items(notifications, key = { it.id }) { notification ->
+                    NotificationCard(
+                        item = notification,
+                        onClick = { 
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            viewModel.marcarComoLida(notification.id) 
+                        }
+                    )
                 }
             }
         }
@@ -103,7 +126,7 @@ fun NotificationsScreen(
 }
 
 @Composable
-fun NotificationCard(item: NotificationItem) {
+fun NotificationCard(item: NotificationItem, onClick: () -> Unit) {
     val icon = when (item.type) {
         NotificationType.PAYMENT -> Icons.Outlined.CheckCircle
         NotificationType.PROMO -> Icons.Outlined.Celebration
@@ -118,13 +141,16 @@ fun NotificationCard(item: NotificationItem) {
         NotificationType.SYSTEM -> TextGray
     }
 
-    val bgColor = if (item.isRead) Color.White else BrandLightGreen.copy(alpha = 0.3f)
+    val bgColor = if (item.isRead) Color.White else BrandLightGreen.copy(alpha = 0.5f)
 
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = PaxDesignSystem.Shapes.Medium,
         colors = CardDefaults.cardColors(containerColor = bgColor),
-        elevation = CardDefaults.cardElevation(0.dp),
-        modifier = Modifier.fillMaxWidth()
+        elevation = CardDefaults.cardElevation(if (item.isRead) 0.dp else 2.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .bounceClick()
+            .clickable { onClick() }
     ) {
         Row(
             modifier = Modifier
@@ -134,7 +160,7 @@ fun NotificationCard(item: NotificationItem) {
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(44.dp)
                     .clip(CircleShape)
                     .background(Color.White),
                 contentAlignment = Alignment.Center
@@ -152,17 +178,18 @@ fun NotificationCard(item: NotificationItem) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = item.title,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = if (item.isRead) FontWeight.Bold else FontWeight.Black,
                         fontSize = 16.sp,
                         color = TextDark
                     )
                     Text(
                         text = item.time,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         color = TextGray
                     )
                 }
@@ -170,7 +197,7 @@ fun NotificationCard(item: NotificationItem) {
                 Text(
                     text = item.message,
                     fontSize = 14.sp,
-                    color = TextGray,
+                    color = if (item.isRead) TextGray else TextDark.copy(alpha = 0.8f),
                     lineHeight = 20.sp
                 )
             }
@@ -179,9 +206,9 @@ fun NotificationCard(item: NotificationItem) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(
                     modifier = Modifier
-                        .size(8.dp)
+                        .size(10.dp)
                         .clip(CircleShape)
-                        .background(NotificationRed)
+                        .background(BrandGreen)
                         .align(Alignment.CenterVertically)
                 )
             }
@@ -197,23 +224,33 @@ fun EmptyState() {
             .padding(top = 100.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            imageVector = Icons.Filled.Notifications,
-            contentDescription = null,
-            tint = Color.LightGray,
-            modifier = Modifier.size(80.dp)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
+        Surface(
+            modifier = Modifier.size(120.dp),
+            color = BrandGreen.copy(alpha = 0.05f),
+            shape = CircleShape
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Filled.Notifications,
+                    contentDescription = null,
+                    tint = BrandGreen.copy(alpha = 0.2f),
+                    modifier = Modifier.size(60.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(24.dp))
         Text(
-            text = "Nenhuma notificação",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = TextGray
+            text = "Tudo em dia!",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = TextDark
         )
         Text(
-            text = "Você está em dia com tudo!",
-            fontSize = 14.sp,
-            color = Color.LightGray
+            text = "Você não possui novas notificações.",
+            fontSize = 15.sp,
+            color = TextGray,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 40.dp).padding(top = 8.dp)
         )
     }
 }

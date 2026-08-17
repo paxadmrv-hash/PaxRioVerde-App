@@ -81,6 +81,31 @@ fun FaleConoscoScreen(onBackClick: () -> Unit) {
                     uriHandler.openUri("https://wa.me/556492331101")
                 }
 
+                InfoCard(
+                    icon = Icons.Default.Phone,
+                    title = "SAC – Serviço de Atendimento ao Cliente/Associado",
+                    modifier = Modifier.clickable {
+                        uriHandler.openUri("https://wa.me/5564992331101")
+                    }
+                ) {
+                    Text("(64) 99233-1101", color = Color.Gray, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Horário de Atendimento", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    ScheduleRow("Segunda a Sexta", "08:00 - 18:00")
+                    ScheduleRow("Sábado", "07:00 - 12:00")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(Res.drawable.ic_whatsapp_social),
+                            contentDescription = null,
+                            colorFilter = ColorFilter.tint(WhatsAppGreen),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Toque para abrir no WhatsApp", color = WhatsAppGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
                 Text("Redes Sociais", fontWeight = FontWeight.Bold, color = Color.DarkGray, modifier = Modifier.padding(top = 8.dp, start = 8.dp))
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {

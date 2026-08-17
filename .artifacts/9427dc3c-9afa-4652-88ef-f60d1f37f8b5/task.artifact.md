@@ -1,0 +1,7 @@
+- [x] Adicionar persistência de notificações no `SessionManager` (Common & Android)
+- [x] Atualizar `NotificationCenter` para gerenciar histórico persistente (Refatorado para `NotificationManager`)
+- [x] Corrigir referências quebradas em `FinanceViewModel.kt` e `BiometricsScreen.kt`
+- [x] Implementar lógica de "Marcar como lida" e remoção individual
+- [x] Aplicar `PaxDesignSystem` e micro-interações na `NotificationsScreen.kt`
+- [x] Refinar visual do "Empty State"
+- [x] Criar walkthrough do novo sistema de notificações

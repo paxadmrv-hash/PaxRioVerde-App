@@ -14,6 +14,7 @@ kotlin {
     androidTarget {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_17)
+            freeCompilerArgs.add("-Xexpect-actual-classes")
         }
     }
     
@@ -24,25 +25,39 @@ kotlin {
         iosTarget.binaries.framework {
             baseName = "ComposeApp"
             isStatic = true
+            freeCompilerArgs += "-Xexpect-actual-classes"
         }
     }
     
     js {
         browser()
         binaries.executable()
+        compilerOptions {
+            freeCompilerArgs.add("-Xexpect-actual-classes")
+        }
     }
     
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         browser()
         binaries.executable()
+        compilerOptions {
+            freeCompilerArgs.add("-Xexpect-actual-classes")
+        }
     }
     
     sourceSets {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.fragment.ktx)
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.koin.android)
+            implementation(libs.androidx.security.crypto)
+            implementation("androidx.biometric:biometric:1.2.0-alpha05")
+            implementation("com.google.android.play:app-update-ktx:2.1.0")
+            implementation("com.google.android.play:review:2.0.1")
+            implementation("com.google.android.play:review-ktx:2.0.1")
 
             // Forçando versões compatíveis com 16KB para CameraX
             val cameraVersion = "1.4.0"
@@ -58,7 +73,6 @@ kotlin {
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)
             implementation(libs.compose.ui)
-            implementation(libs.compose.components.resources)
             implementation(compose.components.resources)
             implementation(compose.materialIconsExtended)
 
@@ -71,6 +85,9 @@ kotlin {
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.ktor.client.logging)
+            implementation(libs.koin.core)
+            implementation(libs.koin.compose)
+            implementation(libs.koin.compose.viewmodel)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -90,8 +107,8 @@ android {
         applicationId = "br.com.paxrioverde.app"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 31
-        versionName = "3.1.10"
+        versionCode = 39
+        versionName = "3.2.3"
         
         ndk {
             debugSymbolLevel = "FULL"

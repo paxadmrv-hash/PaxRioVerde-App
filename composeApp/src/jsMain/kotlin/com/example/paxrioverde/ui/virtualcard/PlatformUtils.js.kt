@@ -7,3 +7,5 @@ actual suspend fun renderPdfBase64ToBitmap(base64Str: String): ImageBitmap? = nu
 actual fun isCardExpired(validity: String): Boolean = false
 
 actual fun ImageBitmap.toByteArray(): ByteArray? = null
+
+actual fun getAppVersionCode(): Int = 0

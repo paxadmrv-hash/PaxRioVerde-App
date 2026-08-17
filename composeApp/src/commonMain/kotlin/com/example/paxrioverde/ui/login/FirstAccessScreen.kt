@@ -18,12 +18,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import org.koin.compose.viewmodel.koinViewModel
 import com.example.paxrioverde.api.ApiService
 import com.example.paxrioverde.util.urlEncode
 import kotlinx.coroutines.launch
@@ -33,51 +37,20 @@ import paxrioverde.composeapp.generated.resources.bg_login_family
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FirstAccessScreen(onBack: () -> Unit) {
-    val scope = rememberCoroutineScope()
+fun FirstAccessScreen(
+    onBack: () -> Unit,
+    viewModel: FirstAccessViewModel = koinViewModel()
+) {
+    val uiState = viewModel.uiState
     val uriHandler = LocalUriHandler.current
     val focusManager = LocalFocusManager.current
+    val fontScale = LocalDensity.current.fontScale
 
-    var cpf by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
-    
-    var passwordVisible by remember { mutableStateOf(false) }
-    var confirmPasswordVisible by remember { mutableStateOf(false) }
-    
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var successMessage by remember { mutableStateOf<String?>(null) }
-
-    val isFormValid = cpf.length == 11 && phone.length >= 10 && email.contains("@") && password.length >= 6 && password == confirmPassword
-
-    fun handleRegister() {
-        isLoading = true
-        errorMessage = null
-        scope.launch {
-            try {
-                val response = ApiService.registrar(
-                    cpf = cpf,
-                    celular = phone,
-                    email = email,
-                    senha = password
-                )
-                if (response.success) {
-                    successMessage = "Solicitação enviada com sucesso!"
-                    kotlinx.coroutines.delay(2000)
-                    onBack()
-                } else {
-                    errorMessage = response.message ?: "Erro ao solicitar acesso"
-                }
-            } catch (e: Exception) {
-                errorMessage = "Erro de conexão: ${e.message}"
-            } finally {
-                isLoading = false
-            }
-        }
-    }
+    val isFormValid = uiState.cpf.length == 11 && 
+                     uiState.phone.length >= 10 && 
+                     uiState.email.contains("@") && 
+                     uiState.password.length >= 6 && 
+                     uiState.password == uiState.confirmPassword
 
     Box(
         modifier = Modifier
@@ -99,6 +72,7 @@ fun FirstAccessScreen(onBack: () -> Unit) {
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
+                .imePadding()
         ) {
             IconButton(
                 onClick = onBack,
@@ -114,19 +88,31 @@ fun FirstAccessScreen(onBack: () -> Unit) {
             ) {
                 Column(
                     modifier = Modifier
-                        .padding(32.dp)
+                        .padding(if (fontScale > 1.3) 16.dp else 32.dp)
                         .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Primeiro Acesso", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF386641))
-                    Text("Preencha os dados para criar sua conta", fontSize = 14.sp, color = Color.Gray, modifier = Modifier.padding(top = 8.dp))
+                    Text(
+                        text = "Primeiro Acesso", 
+                        fontSize = if (fontScale > 1.3) 20.sp else 24.sp, 
+                        fontWeight = FontWeight.Bold, 
+                        color = Color(0xFF386641),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "Preencha os dados para criar sua conta", 
+                        fontSize = 14.sp, 
+                        color = Color.Gray, 
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                     
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(if (fontScale > 1.3) 16.dp else 32.dp))
 
                     LoginTextField(
-                        value = cpf,
-                        onValueChange = { cpf = it.filter { c -> c.isDigit() }.take(11) },
-                        label = "Seu CPF (SOMENTE TITULAR DO PLANO)",
+                        value = uiState.cpf,
+                        onValueChange = { viewModel.onCpfChange(it) },
+                        label = "Seu CPF (TITULAR DO PLANO OU DEPENDENTE COM ACESSO)",
                         icon = Icons.Default.Badge,
                         keyboardType = KeyboardType.Number,
                         visualTransformation = CpfVisualTransformation()
@@ -135,8 +121,8 @@ fun FirstAccessScreen(onBack: () -> Unit) {
                     Spacer(modifier = Modifier.height(16.dp))
 
                     LoginTextField(
-                        value = phone,
-                        onValueChange = { phone = it.filter { c -> c.isDigit() } },
+                        value = uiState.phone,
+                        onValueChange = { viewModel.onPhoneChange(it) },
                         label = "WhatsApp com DDD",
                         icon = Icons.Default.Phone,
                         keyboardType = KeyboardType.Phone
@@ -145,8 +131,8 @@ fun FirstAccessScreen(onBack: () -> Unit) {
                     Spacer(modifier = Modifier.height(16.dp))
 
                     LoginTextField(
-                        value = email,
-                        onValueChange = { email = it },
+                        value = uiState.email,
+                        onValueChange = { viewModel.onEmailChange(it) },
                         label = "E-mail",
                         icon = Icons.Default.Email,
                         keyboardType = KeyboardType.Email
@@ -155,46 +141,46 @@ fun FirstAccessScreen(onBack: () -> Unit) {
                     Spacer(modifier = Modifier.height(16.dp))
 
                     LoginTextField(
-                        value = password,
-                        onValueChange = { password = it },
+                        value = uiState.password,
+                        onValueChange = { viewModel.onPasswordChange(it) },
                         label = "Crie uma Senha",
                         icon = Icons.Default.Lock,
                         keyboardType = KeyboardType.Password,
                         isPassword = true,
-                        isPasswordVisible = passwordVisible,
-                        onVisibilityChange = { passwordVisible = !passwordVisible }
+                        isPasswordVisible = uiState.passwordVisible,
+                        onVisibilityChange = { viewModel.togglePasswordVisibility() }
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
                     LoginTextField(
-                        value = confirmPassword,
-                        onValueChange = { confirmPassword = it },
+                        value = uiState.confirmPassword,
+                        onValueChange = { viewModel.onConfirmPasswordChange(it) },
                         label = "Confirme a Senha",
                         icon = Icons.Default.LockReset,
                         keyboardType = KeyboardType.Password,
                         isPassword = true,
-                        isPasswordVisible = confirmPasswordVisible,
-                        onVisibilityChange = { confirmPasswordVisible = !confirmPasswordVisible }
+                        isPasswordVisible = uiState.confirmPasswordVisible,
+                        onVisibilityChange = { viewModel.toggleConfirmPasswordVisibility() }
                     )
 
-                    if (errorMessage != null) {
-                        Text(errorMessage!!, color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                    if (uiState.errorMessage != null) {
+                        Text(uiState.errorMessage, color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
                     }
-                    if (successMessage != null) {
-                        Text(successMessage!!, color = Color(0xFF386641), fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+                    if (uiState.successMessage != null) {
+                        Text(uiState.successMessage, color = Color(0xFF386641), fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
                     }
 
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(if (fontScale > 1.3) 16.dp else 32.dp))
 
                     Button(
-                        onClick = { handleRegister() },
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        onClick = { viewModel.handleRegister(onBack) },
+                        modifier = Modifier.fillMaxWidth().height(if (fontScale > 1.3) 48.dp else 56.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF386641)),
-                        enabled = isFormValid && !isLoading
+                        enabled = isFormValid && !uiState.isLoading
                     ) {
-                        if (isLoading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        if (uiState.isLoading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                         else Text("SOLICITAR ACESSO", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
 
