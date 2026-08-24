@@ -30,6 +30,8 @@ import org.koin.core.module.dsl.viewModelOf
 import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import org.koin.core.module.dsl.bind
+import org.koin.core.context.startKoin
+import org.koin.dsl.KoinAppDeclaration
 
 /**
  * Módulo de rede: Concentra a configuração do cliente HTTP e serviços de API.
@@ -81,3 +83,12 @@ val viewModelModule = module {
 val appModule = module {
     includes(networkModule, dataModule, viewModelModule)
 }
+
+/**
+ * Inicializador global do Koin para Multiplatform.
+ */
+fun initKoin(appDeclaration: KoinAppDeclaration = {}) =
+    startKoin {
+        appDeclaration()
+        modules(appModule)
+    }

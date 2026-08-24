@@ -28,6 +28,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.max
 import org.jetbrains.compose.resources.painterResource
 import paxrioverde.composeapp.generated.resources.*
 
@@ -74,14 +80,19 @@ fun WhatsNewModal(
             dismissOnClickOutside = false
         )
     ) {
+        // Garantimos que o conteúdo do diálogo saiba lidar com os insets da tela cheia
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = Color.White
         ) {
+            // Aumentando o respiro para subir o botão um pouco mais
+            val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            val safeBottomPadding = if (navBarPadding > 0.dp) navBarPadding + 32.dp else 96.dp
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .systemBarsPadding()
+                    .statusBarsPadding()
             ) {
                 // Header com botão Pular
                 Box(
@@ -161,7 +172,7 @@ fun WhatsNewModal(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 32.dp, vertical = 32.dp),
+                        .padding(start = 32.dp, end = 32.dp, bottom = safeBottomPadding, top = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Indicador de Página (Dots)
