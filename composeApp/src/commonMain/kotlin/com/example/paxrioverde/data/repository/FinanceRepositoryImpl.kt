@@ -10,13 +10,18 @@ import kotlinx.datetime.*
 
 class FinanceRepositoryImpl(
     private val api: ApiService,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val walletCache: WalletCache
 ) : FinanceRepository {
 
     override suspend fun getMensalidades(idcliente: Int): NetworkResult<List<AnoItem>> {
         return safeApiCall {
             val response = api.getMensalidades(idcliente)
             if (response.success) {
+                // Senior Sincronização: Atualiza o cache global para que o Dashboard e Carteira fiquem em dia.
+                walletCache.mensalidadesList.clear()
+                walletCache.mensalidadesList.addAll(response.anos?.flatMap { it.mensalidades } ?: emptyList())
+                
                 response.anos ?: emptyList()
             } else {
                 throw Exception(response.message ?: "Erro ao carregar mensalidades")

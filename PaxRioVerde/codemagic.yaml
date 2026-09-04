@@ -1,0 +1,61 @@
+workflows:
+  ios-workflow:
+    name: Pax Rio Verde iOS Final (Automated)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      groups:
+        - "Pax Rio Verde"
+      vars:
+        XCODE_PROJECT: "iosApp/iosApp.xcodeproj"
+        XCODE_SCHEME: "iosApp"
+        APP_ID: "br.com.paxrioverde.app"
+        # O Codemagic usa esta variável automaticamente para proteger o P12
+        CERTIFICATE_PASSWORD: "pax_rioverde_pro"
+
+    scripts:
+      - name: Initialize Keychain
+        script: |
+          keychain initialize
+          keychain make-default
+
+      - name: Fetch Signing Files
+        script: |
+          # 1. Comando limpo: o APP_ID deve ir no final sem flags antes dele
+          # 2. --create vai gerar o certificado se o portal estiver limpo
+          # 3. --p12-password vincula a senha que definimos nas vars
+          app-store-connect fetch-signing-files "$APP_ID" \
+            --type IOS_APP_STORE \
+            --create \
+            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            --p12-password "$CERTIFICATE_PASSWORD"
+          
+          # 4. O comando add-certificates sem flags busca nos caminhos padrão
+          keychain add-certificates
+
+      - name: Set up code signing settings on Xcode project
+        script: xcode-project use-profiles
+
+      - name: Build and Sign IPA
+        script: |
+          #!/usr/bin/env bash
+          set -e -o pipefail
+          
+          chmod +x gradlew
+          ./gradlew clean
+          
+          mkdir -p build/ios/xcarchive
+          mkdir -p build/ios/ipa
+
+          echo " Iniciando build final para Pax Rio Verde..."
+          xcode-project build-ipa \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -archive-path build/ios/xcarchive/app.xcarchive \
+            -ipa-path build/ios/ipa/PaxRioVerde.ipa \
+            -configuration Release
+
+    artifacts:
+      - build/ios/ipa/*.ipa

@@ -38,7 +38,9 @@ data class DrawerMenuItem(val icon: ImageVector, val text: String, val screen: S
 fun AppDrawer(
     currentScreen: Screen,
     isDependent: Boolean = false,
+    hasMultipleProfiles: Boolean = false,
     onNavigate: (Screen) -> Unit,
+    onSwitchProfile: () -> Unit = {},
     onLogout: () -> Unit,
     closeDrawer: () -> Unit
 ) {
@@ -161,6 +163,41 @@ fun AppDrawer(
             }
 
             Spacer(modifier = Modifier.weight(1f))
+
+            // TROCAR PERFIL (Opcional)
+            if (hasMultipleProfiles) {
+                Surface(
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onSwitchProfile()
+                        closeDrawer()
+                    },
+                    color = BrandLime.copy(alpha = 0.08f),
+                    shape = PaxDesignSystem.Shapes.Medium,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .bounceClick()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SwitchAccount,
+                            contentDescription = null,
+                            tint = BrandLime,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            text = "Trocar Perfil",
+                            fontWeight = FontWeight.Bold,
+                            color = TextDark,
+                            fontSize = 15.sp
+                        )
+                    }
+                }
+            }
 
             // RODAPÉ E SAIR
             Surface(

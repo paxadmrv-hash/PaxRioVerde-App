@@ -107,8 +107,8 @@ android {
         applicationId = "br.com.paxrioverde.app"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 41
-        versionName = "3.4.4"
+        versionCode = 42
+        versionName = "3.4.5"
         
         ndk {
             debugSymbolLevel = "FULL"

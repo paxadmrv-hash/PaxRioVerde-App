@@ -18,7 +18,9 @@ data class LoginUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val suggestFirstAccess: Boolean = false,
-    val loginResponse: LoginResponse? = null
+    val loginResponse: LoginResponse? = null,
+    val profiles: List<LoginResponse> = emptyList(),
+    val showProfileSelection: Boolean = false
 )
 
 class LoginViewModel(
@@ -91,12 +93,18 @@ class LoginViewModel(
 
             when (result) {
                 is NetworkResult.Success -> {
-                    val response = result.data
-                    if (response.success) {
-                        _uiState.update { it.copy(isLoading = false, loginResponse = response) }
-                        onSuccess(response)
+                    val profiles = result.data
+                    if (profiles.isNotEmpty() && profiles.any { it.success }) {
+                        if (profiles.size > 1) {
+                            _uiState.update { it.copy(isLoading = false, profiles = profiles, showProfileSelection = true) }
+                        } else {
+                            val response = profiles.first { it.success }
+                            _uiState.update { it.copy(isLoading = false, loginResponse = response) }
+                            onSuccess(response)
+                        }
                     } else {
-                        val msg = response.message ?: "CPF ou senha inválidos"
+                        val response = profiles.firstOrNull()
+                        val msg = response?.message ?: "CPF ou senha inválidos"
                         val shouldSuggest = msg.contains("senha não cadastrada", ignoreCase = true) || 
                                            msg.contains("primeiro acesso", ignoreCase = true) ||
                                            msg.contains("usuário sem senha", ignoreCase = true) ||
@@ -122,6 +130,10 @@ class LoginViewModel(
     
     fun clearError() {
         _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    fun resetProfileSelection() {
+        _uiState.update { it.copy(showProfileSelection = false) }
     }
 
     fun onBiometricError(error: String) {

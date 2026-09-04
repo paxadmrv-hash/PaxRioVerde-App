@@ -81,6 +81,12 @@ actual class SessionManager actual constructor() {
     actual fun getSavedDependentsJson(): String = prefs.getString("saved_dependents_json", "") ?: ""
     actual fun saveDependentsJson(json: String) = prefs.edit().putString("saved_dependents_json", json).apply()
 
+    actual fun getSavedProfilesJson(): String = prefs.getString("saved_profiles_json", "") ?: ""
+    actual fun saveProfilesJson(json: String) = prefs.edit().putString("saved_profiles_json", json).apply()
+
+    actual fun getActiveProfileIndex(): Int = prefs.getInt("active_profile_index", 0)
+    actual fun saveActiveProfileIndex(index: Int) = prefs.edit().putInt("active_profile_index", index).apply()
+
     actual fun getGraceStartTimestamp(): Long = prefs.getLong("grace_start_timestamp", 0L)
     actual fun saveGraceStartTimestamp(timestamp: Long) = prefs.edit().putLong("grace_start_timestamp", timestamp).apply()
 

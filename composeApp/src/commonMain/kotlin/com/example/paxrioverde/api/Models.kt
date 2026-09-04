@@ -23,7 +23,8 @@ data class LoginResponse(
     @SerialName("boleto_prox_mens") val boleto_prox_mens: Boolean? = false,
     @SerialName("cpf") val cpf: String? = null,
     @SerialName("dependente") val dependente: String? = "N",
-    @SerialName("token") val token: String? = null
+    @SerialName("token") val token: String? = null,
+    @SerialName("perfis") val perfis: List<LoginResponse>? = null
 )
 
 @Serializable

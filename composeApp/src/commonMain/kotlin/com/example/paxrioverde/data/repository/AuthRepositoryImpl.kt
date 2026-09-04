@@ -6,6 +6,7 @@ import com.example.paxrioverde.data.util.safeApiCall
 import com.example.paxrioverde.domain.model.NetworkResult
 import com.example.paxrioverde.domain.repository.AuthRepository
 import com.example.paxrioverde.util.SessionManager
+import kotlinx.serialization.json.*
 
 /**
  * Implementação do repositório de autenticação com resiliência de rede.
@@ -15,23 +16,27 @@ class AuthRepositoryImpl(
     private val sessionManager: SessionManager
 ) : AuthRepository {
 
-    override suspend fun login(cpf: String, pass: String, rememberMe: Boolean): NetworkResult<LoginResponse> {
+    override suspend fun login(cpf: String, pass: String, rememberMe: Boolean): NetworkResult<List<LoginResponse>> {
         return safeApiCall {
             val cleanCpf = cpf.filter { it.isDigit() }
-            val response = api.login(cleanCpf, pass)
+            val profiles = api.login(cleanCpf, pass)
             
-            // Senior Fix: Garante que o CPF esteja no objeto mesmo que o servidor não retorne
-            val finalResponse = if (response.success && response.cpf.isNullOrEmpty()) {
-                response.copy(cpf = cleanCpf)
-            } else {
-                response
+            val finalProfiles = profiles.map { response ->
+                if (response.success && response.cpf.isNullOrEmpty()) {
+                    response.copy(cpf = cleanCpf)
+                } else {
+                    response
+                }
             }
 
-            if (finalResponse.success) {
-                finalResponse.token?.let { sessionManager.saveAccessToken(it) }
+            if (finalProfiles.isNotEmpty() && finalProfiles.any { it.success }) {
+                // Salva o token do primeiro perfil de sucesso
+                finalProfiles.firstOrNull { it.success }?.token?.let { 
+                    sessionManager.saveAccessToken(it) 
+                }
                 handleRememberMe(cleanCpf, pass, rememberMe)
             }
-            finalResponse
+            finalProfiles
         }
     }
 

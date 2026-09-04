@@ -11,6 +11,8 @@ import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
@@ -33,6 +35,7 @@ import com.example.paxrioverde.ui.laboratorio.ExamesLaboratoriaisScreen
 import com.example.paxrioverde.ui.login.FirstAccessScreen
 import com.example.paxrioverde.ui.login.ForgotPasswordScreen
 import com.example.paxrioverde.ui.login.LoginScreen
+import com.example.paxrioverde.ui.login.ProfileSelectionScreen
 import com.example.paxrioverde.ui.notifications.NotificationsScreen
 import com.example.paxrioverde.ui.pet.MundoPetScreen
 import com.example.paxrioverde.ui.plans.PlansScreen
@@ -43,6 +46,8 @@ import com.example.paxrioverde.ui.theme.AppGrupoUniversoTheme
 import com.example.paxrioverde.ui.virtualcard.VirtualCardScreen
 import com.example.paxrioverde.util.*
 import kotlinx.coroutines.launch
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import org.koin.compose.KoinContext
 import org.koin.compose.koinInject
 
@@ -62,18 +67,20 @@ enum class Screen {
     VirtualCard,
     Laboratorio,
     MedSaude,
-    ForgotPassword
+    ForgotPassword,
+    ProfileSelection
 }
 
 @Composable
 fun App(initialScreen: Screen? = null) {
-    val authRepository = koinInject<AuthRepository>()
-    val sessionManager = koinInject<SessionManager>()
-    val walletCache = koinInject<WalletCache>()
-    val connectivityObserver = koinInject<ConnectivityObserver>()
-    val biometricAuthenticator = koinInject<BiometricAuthenticator>()
-    
-    val networkStatus by connectivityObserver.status.collectAsState(ConnectivityObserver.Status.Available)
+    KoinContext {
+        val authRepository = koinInject<AuthRepository>()
+        val sessionManager = koinInject<SessionManager>()
+        val walletCache = koinInject<WalletCache>()
+        val connectivityObserver = koinInject<ConnectivityObserver>()
+        val biometricAuthenticator = koinInject<BiometricAuthenticator>()
+        
+        val networkStatus by connectivityObserver.status.collectAsState(ConnectivityObserver.Status.Available)
         val isOffline = networkStatus != ConnectivityObserver.Status.Available
         
         var wasOffline by remember { mutableStateOf(false) }
@@ -97,6 +104,14 @@ fun App(initialScreen: Screen? = null) {
                 restore = { mutableStateOf(kotlinx.serialization.json.Json.decodeFromString(LoginResponse.serializer(), it)) }
             )
         ) { mutableStateOf<LoginResponse?>(null) }
+
+        var availableProfiles by rememberSaveable(
+            saver = Saver<MutableState<List<LoginResponse>>, String>(
+                save = { Json.encodeToString(ListSerializer(LoginResponse.serializer()), it.value) },
+                restore = { mutableStateOf(Json.decodeFromString(ListSerializer(LoginResponse.serializer()), it)) }
+            )
+        ) { mutableStateOf<List<LoginResponse>>(emptyList()) }
+
         var showRootWarning by remember { mutableStateOf(false) }
         
         val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -153,7 +168,14 @@ fun App(initialScreen: Screen? = null) {
                                 try {
                                     val result = authRepository.login(savedCpf, savedPass, true)
                                     if (result is NetworkResult.Success) {
-                                        userData = result.data
+                                        availableProfiles = result.data
+                                        // Se já temos um userData, tentamos manter o mesmo perfil
+                                        val currentId = userData?.idcliente
+                                        userData = if (currentId != null) {
+                                            result.data.find { it.idcliente == currentId } ?: result.data.firstOrNull()
+                                        } else {
+                                            result.data.firstOrNull()
+                                        }
                                     }
                                 } catch (e: Exception) {
                                     PaxLogger.e("Erro ao atualizar dados", e, "App")
@@ -175,7 +197,14 @@ fun App(initialScreen: Screen? = null) {
                         try {
                             val result = authRepository.login(savedCpf, savedPass, true)
                             if (result is NetworkResult.Success) {
-                                userData = result.data
+                                availableProfiles = result.data
+                                // Se já temos um userData, tentamos manter o mesmo perfil
+                                val currentId = userData?.idcliente
+                                userData = if (currentId != null) {
+                                    result.data.find { it.idcliente == currentId } ?: result.data.firstOrNull()
+                                } else {
+                                    result.data.firstOrNull()
+                                }
                             }
                         } catch (e: Exception) {
                             PaxLogger.e("Erro ao atualizar dados", e, "App")
@@ -242,6 +271,10 @@ fun App(initialScreen: Screen? = null) {
                             userData = response
                             navigateTo(Screen.Dashboard, clearStack = true)
                         },
+                        onProfileSelection = { profiles ->
+                            availableProfiles = profiles
+                            navigateTo(Screen.ProfileSelection)
+                        },
                         onFirstAccessClick = { navigateTo(Screen.FirstAccess) },
                         onForgotPasswordClick = { navigateTo(Screen.ForgotPassword) }
                     )
@@ -254,9 +287,11 @@ fun App(initialScreen: Screen? = null) {
                                 AppDrawer(
                                     currentScreen = currentScreen,
                                     isDependent = userData?.dependente == "S",
+                                    hasMultipleProfiles = availableProfiles.size > 1,
                                     onNavigate = { screen ->
                                         if (screen == Screen.Login) {
                                             userData = null
+                                            availableProfiles = emptyList()
                                             walletCache.clear()
                                             sessionManager.clearAllCache()
                                             navigateTo(Screen.Login, clearStack = true)
@@ -265,8 +300,12 @@ fun App(initialScreen: Screen? = null) {
                                         }
                                         scope.launch { drawerState.close() }
                                     },
+                                    onSwitchProfile = {
+                                        navigateTo(Screen.ProfileSelection)
+                                    },
                                     onLogout = {
                                         userData = null
+                                        availableProfiles = emptyList()
                                         walletCache.clear()
                                         sessionManager.clearAllCache()
                                         navigateTo(Screen.Login, clearStack = true)
@@ -348,11 +387,21 @@ fun App(initialScreen: Screen? = null) {
                                                 valorCartao = userData?.valorcartao,
                                                 isDependent = userData?.dependente == "S",
                                                 userName = userData?.nomecliente,
+                                                userCpf = userData?.cpf,
                                                 onCardGenerated = { refreshUserData() },
                                                 onNavigateToFinance = { navigateTo(Screen.Finance) }
                                             )
                                             Screen.Laboratorio -> ExamesLaboratoriaisScreen(onBack = { goBack() })
                                             Screen.MedSaude -> MedSaudeScreen(onBackClick = { goBack() })
+                                            Screen.ProfileSelection -> ProfileSelectionScreen(
+                                                profiles = availableProfiles,
+                                                onProfileSelected = { selected ->
+                                                    userData = selected
+                                                    // Senior Security: Atualiza o token da sessão para o perfil selecionado
+                                                    selected.token?.let { sessionManager.saveAccessToken(it) }
+                                                    navigateTo(Screen.Dashboard, clearStack = true)
+                                                }
+                                            )
                                             else -> {}
                                         }
                                     }
@@ -371,4 +420,5 @@ fun App(initialScreen: Screen? = null) {
                 )
             }
         }
+    }
 }

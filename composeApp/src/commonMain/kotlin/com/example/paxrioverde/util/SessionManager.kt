@@ -33,6 +33,12 @@ expect class SessionManager() {
     fun getSavedDependentsJson(): String
     fun saveDependentsJson(json: String)
 
+    fun getSavedProfilesJson(): String
+    fun saveProfilesJson(json: String)
+
+    fun getActiveProfileIndex(): Int
+    fun saveActiveProfileIndex(index: Int)
+
     fun getGraceStartTimestamp(): Long
     fun saveGraceStartTimestamp(timestamp: Long)
 

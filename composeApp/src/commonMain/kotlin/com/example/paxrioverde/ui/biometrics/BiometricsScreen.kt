@@ -267,7 +267,7 @@ fun BiometricsScreen(
                             )
                             
                             isValidating = false
-                            if (result is NetworkResult.Success && result.data.success) {
+                            if (result is NetworkResult.Success && result.data.any { it.success }) {
                                 isBiometricEnabled = true
                                 authRepository.updateBiometricStatus(true)
                                 showPasswordDialog = false

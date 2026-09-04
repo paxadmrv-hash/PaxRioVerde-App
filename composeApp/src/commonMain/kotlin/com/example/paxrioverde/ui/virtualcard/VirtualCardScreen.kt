@@ -2,6 +2,7 @@ package com.example.paxrioverde.ui.virtualcard
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -57,6 +58,9 @@ import paxrioverde.composeapp.generated.resources.*
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import kotlinx.coroutines.delay
 
 val WalletDarkBg = Color(0xFF13211C)
 val WalletCardBg = Color(0xFF1E1E1E)
@@ -100,6 +104,7 @@ fun VirtualCardScreen(
     valorCartao: String? = null,
     isDependent: Boolean = false,
     userName: String? = null,
+    userCpf: String? = null,
     onCardGenerated: () -> Unit = {},
     onNavigateToFinance: () -> Unit = {},
     viewModel: VirtualCardViewModel = koinViewModel()
@@ -133,7 +138,7 @@ fun VirtualCardScreen(
     LaunchedEffect(cardToShare) {
         cardToShare?.let { card ->
             try {
-                kotlinx.coroutines.delay(100)
+                delay(100)
                 val bitmap = silentCaptureLayer.toImageBitmap()
                 val bytes = bitmap.toByteArray()
                 if (bytes != null) {
@@ -144,7 +149,7 @@ fun VirtualCardScreen(
                     )
                 }
             } catch (e: Exception) {
-                com.example.paxrioverde.util.PaxLogger.e("Erro na captura de imagem", e, "VirtualCard")
+                PaxLogger.e("Erro na captura de imagem", e, "VirtualCard")
             } finally {
                 cardToShare = null
             }
@@ -299,20 +304,21 @@ fun VirtualCardScreen(
                     .navigationBarsPadding()
                     .padding(24.dp)
             ) {
-                if (!isDependent) {
-                    Button(
-                        onClick = { showGerarDialog = true },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp)
-                            .height(50.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = PaxDesignSystem.Colors.BrandLightGreen),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.Add, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Gerar Novo Cartão", fontWeight = FontWeight.Bold)
-                    }
+                Button(
+                    onClick = { showGerarDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                        .height(50.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PaxDesignSystem.Colors.BrandLightGreen),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Add, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (isDependent) "Gerar Meu Cartão" else "Gerar Novo Cartão",
+                        fontWeight = FontWeight.Bold
+                    )
                 }
 
                 Text(
@@ -382,6 +388,9 @@ fun VirtualCardScreen(
             idconvenio = idconvenio,
             idfilial = idfilial,
             valorCartao = valorCartao,
+            isUserDependent = isDependent,
+            userName = userName,
+            userCpf = userCpf,
             onSuccess = onCardGenerated,
             onNavigateToFinance = onNavigateToFinance,
             viewModel = viewModel
@@ -603,7 +612,7 @@ fun CardExpansionDialog(item: CartaoItem, onDismiss: () -> Unit) {
                                         )
                                     }
                                 } catch (e: Exception) {
-                                    com.example.paxrioverde.util.PaxLogger.e("Erro na operação de imagem", e, "VirtualCard")
+                                    PaxLogger.e("Erro na operação de imagem", e, "VirtualCard")
                                 }
                             }
                         },
@@ -635,14 +644,14 @@ fun CardExpansionDialog(item: CartaoItem, onDismiss: () -> Unit) {
                                             fileName = "cartao_pax_${item.idContrato}"
                                         )
                                     } else {
-                                        com.example.paxrioverde.util.PaxLogger.e("Erro: toByteArray retornou null", subTag = "VirtualCard")
+                                        PaxLogger.e("Erro: toByteArray retornou null", subTag = "VirtualCard")
                                     }
                                 } catch (e: Exception) {
-                                    com.example.paxrioverde.util.PaxLogger.e("Erro ao baixar", e, "VirtualCard")
+                                    PaxLogger.e("Erro ao baixar", e, "VirtualCard")
                                 }
                             }
                         },
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.Gray),
+                        border = BorderStroke(1.dp, Color.Gray),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.weight(1f).height(50.dp),
                         contentPadding = PaddingValues(horizontal = 8.dp)
@@ -680,8 +689,11 @@ fun GerarCartaoDialog(
     idcaixa: Int,
     idcontrato: Int,
     idconvenio: Int,
-    idfilial: Int, // Adicionado de volta
+    idfilial: Int,
     valorCartao: String? = null,
+    isUserDependent: Boolean = false,
+    userName: String? = null,
+    userCpf: String? = null,
     onSuccess: () -> Unit = {},
     onNavigateToFinance: () -> Unit = {},
     viewModel: VirtualCardViewModel
@@ -689,7 +701,7 @@ fun GerarCartaoDialog(
     val walletCache: WalletCache = koinInject()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     
-    var isTitular by remember { mutableStateOf(true) }
+    var isTitular by remember { mutableStateOf(!isUserDependent) }
     val dependentesList = walletCache.dependentesList
     var selectedDependente by remember { mutableStateOf<DependenteItem?>(null) }
     var expanded by remember { mutableStateOf(false) }
@@ -700,7 +712,7 @@ fun GerarCartaoDialog(
 
     val scope = rememberCoroutineScope()
     @Suppress("DEPRECATION")
-    val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
+    val clipboardManager = LocalClipboardManager.current
 
     // Calcula a nova validade baseada na fidelidade (WalletCache)
     val calculatedValidity = remember(walletCache.mensalidadesList.size) {
@@ -725,7 +737,13 @@ fun GerarCartaoDialog(
             ) {
                 when (val state = uiState) {
                     is VirtualCardState.Idle -> {
-                        Text("Gerar Novo Cartão", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = PaxDesignSystem.Colors.BrandLightGreen, modifier = Modifier.padding(bottom = 16.dp))
+                        Text(
+                            if (isUserDependent) "Gerar Meu Cartão" else "Gerar Novo Cartão",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PaxDesignSystem.Colors.BrandLightGreen,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
 
                         if (calculatedValidity.isNotEmpty()) {
                             Surface(
@@ -749,16 +767,18 @@ fun GerarCartaoDialog(
                             }
                         }
 
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { isTitular = true }) {
-                            RadioButton(selected = isTitular, onClick = { isTitular = true }, colors = RadioButtonDefaults.colors(selectedColor = PaxDesignSystem.Colors.BrandLightGreen))
-                            Text("Titular", color = Color.Black)
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { isTitular = false }) {
-                            RadioButton(selected = !isTitular, onClick = { isTitular = false }, colors = RadioButtonDefaults.colors(selectedColor = PaxDesignSystem.Colors.BrandLightGreen))
-                            Text("Dependente", color = Color.Black)
-                        }
+                        if (!isUserDependent) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { isTitular = true }) {
+                                RadioButton(selected = isTitular, onClick = { isTitular = true }, colors = RadioButtonDefaults.colors(selectedColor = PaxDesignSystem.Colors.BrandLightGreen))
+                                Text("Titular", color = Color.Black)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { isTitular = false }) {
+                                RadioButton(selected = !isTitular, onClick = { isTitular = false }, colors = RadioButtonDefaults.colors(selectedColor = PaxDesignSystem.Colors.BrandLightGreen))
+                                Text("Dependente", color = Color.Black)
+                            }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
 
                         if (!isTitular) {
                             Text("Estilo do Cartão", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
@@ -781,25 +801,37 @@ fun GerarCartaoDialog(
                                     }
                                 }
                             }
-                            Spacer(modifier = Modifier.height(16.dp))
-                            ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
-                                OutlinedTextField(
-                                    value = selectedDependente?.nomeDependente ?: "Selecione o dependente",
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PaxDesignSystem.Colors.BrandLightGreen, unfocusedBorderColor = Color.LightGray, focusedTextColor = Color.Black, unfocusedTextColor = Color.Black)
-                                )
-                                ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.background(Color.White)) {
-                                    dependentesList.forEach { dep ->
-                                        DropdownMenuItem(
-                                            text = { Text("${dep.nomeDependente}", color = Color.Black) },
-                                            onClick = { selectedDependente = dep; expanded = false },
-                                            colors = MenuDefaults.itemColors(textColor = Color.Black)
-                                        )
+                            
+                            if (!isUserDependent) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
+                                    OutlinedTextField(
+                                        value = selectedDependente?.nomeDependente ?: "Selecione o dependente",
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                                        modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PaxDesignSystem.Colors.BrandLightGreen, unfocusedBorderColor = Color.LightGray, focusedTextColor = Color.Black, unfocusedTextColor = Color.Black)
+                                    )
+                                    ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, modifier = Modifier.background(Color.White)) {
+                                        dependentesList.forEach { dep ->
+                                            DropdownMenuItem(
+                                                text = { Text("${dep.nomeDependente}", color = Color.Black) },
+                                                onClick = { selectedDependente = dep; expanded = false },
+                                                colors = MenuDefaults.itemColors(textColor = Color.Black)
+                                            )
+                                        }
                                     }
                                 }
+                            } else {
+                                // Se o usuário for dependente, ele gera o cartão para SI MESMO
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Gerando cartão para: $userName",
+                                    fontSize = 12.sp,
+                                    color = Color.Gray,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             }
                         } else {
                             LaunchedEffect(Unit) { selectedEstilo = "Adulto" }
@@ -809,7 +841,22 @@ fun GerarCartaoDialog(
                         
                         Button(
                             onClick = { 
-                                if (isTitular || selectedDependente != null) {
+                                if (isUserDependent) {
+                                    // Fluxo simplificado para dependente
+                                    viewModel.gerarCartaoDireto(
+                                        idcaixa = idcaixa,
+                                        idcliente = idcliente,
+                                        tipo = "dependente",
+                                        nomeDependente = userName,
+                                        isGratuito = true,
+                                        idcontrato = idcontrato,
+                                        idconvenio = idconvenio,
+                                        cpfDependente = userCpf,
+                                        dtvencimento = calculatedValidity,
+                                        parentesco = "DEPENDENTE",
+                                        idfilial = idfilial
+                                    )
+                                } else if (isTitular || selectedDependente != null) {
                                     viewModel.gerarCartaoDireto(
                                         idcaixa = idcaixa,
                                         idcliente = idcliente,
@@ -856,7 +903,7 @@ fun GerarCartaoDialog(
                         Spacer(modifier = Modifier.height(16.dp))
                         Button(
                             onClick = { 
-                                clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(state.pixCode))
+                                clipboardManager.setText(AnnotatedString(state.pixCode))
                             },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(containerColor = PaxDesignSystem.Colors.BrandLightGreen)

@@ -17,7 +17,9 @@ import org.jetbrains.compose.resources.DrawableResource
 data class DashboardUiState(
     val expandedImageRes: DrawableResource? = null,
     val showWhatsNew: Boolean = false,
-    val planStatus: PlanStatus = PlanStatus.ACTIVE
+    val planStatus: PlanStatus = PlanStatus.ACTIVE,
+    val nextPaymentDate: String? = null,
+    val nextPaymentValue: String? = null
 )
 
 class DashboardViewModel(
@@ -59,8 +61,18 @@ class DashboardViewModel(
         viewModelScope.launch {
             val result = financeRepository.getMensalidades(idcliente)
             if (result is NetworkResult.Success) {
-                val status = financeRepository.calculatePlanStatus(result.data)
-                uiState = uiState.copy(planStatus = status)
+                val anos = result.data
+                val status = financeRepository.calculatePlanStatus(anos)
+                val oldestUnpaid = financeRepository.getOldestUnpaid(anos)
+                
+                uiState = uiState.copy(
+                    planStatus = status,
+                    nextPaymentDate = oldestUnpaid?.dtvencimento,
+                    nextPaymentValue = oldestUnpaid?.valormensalidade
+                )
+
+                // Sincroniza notificações se a data mudou após pagamento
+                oldestUnpaid?.dtvencimento?.let { scheduleNotifications(it) }
             }
         }
     }

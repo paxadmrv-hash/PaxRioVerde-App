@@ -9,10 +9,12 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.*
 import com.example.paxrioverde.util.AppConstants
 import com.example.paxrioverde.util.SessionManager
 import com.example.paxrioverde.util.isDebug
+import com.example.paxrioverde.util.PaxLogger
+import kotlinx.serialization.json.JsonElement
 
 class ApiService(private val sessionManager: SessionManager) {
     val client = HttpClient {
@@ -55,13 +57,38 @@ class ApiService(private val sessionManager: SessionManager) {
         }
     }
 
-    suspend fun login(login: String, senha: String): LoginResponse {
-        return client.post("login_app") {
+    suspend fun login(login: String, senha: String): List<LoginResponse> {
+        val response = client.post("login_app") {
             setBody(FormDataContent(Parameters.build {
                 append("login", login)
                 append("senha", senha)
             }))
-        }.body()
+        }
+        
+        val json = Json { 
+            ignoreUnknownKeys = true 
+            coerceInputValues = true
+            isLenient = true
+        }
+
+        return try {
+            val responseText = response.body<String>()
+            PaxLogger.d("Resposta Login: $responseText", "ApiService")
+            val baseResponse = json.decodeFromString<LoginResponse>(responseText)
+            
+            if (!baseResponse.perfis.isNullOrEmpty()) {
+                // Caso a API retorne a nova estrutura com a lista dentro de "perfis"
+                baseResponse.perfis.map { it.copy(success = baseResponse.success, message = baseResponse.message) }
+            } else if (baseResponse.success) {
+                // Fallback para caso retorne apenas um objeto de sucesso fora da lista
+                listOf(baseResponse)
+            } else {
+                listOf(baseResponse)
+            }
+        } catch (e: Exception) {
+            PaxLogger.e("Erro ao processar login", e, "ApiService")
+            listOf(LoginResponse(success = false, message = "Erro ao processar resposta: ${e.message}"))
+        }
     }
 
     suspend fun registrar(cpf: String, celular: String, email: String, senha: String): LoginResponse {

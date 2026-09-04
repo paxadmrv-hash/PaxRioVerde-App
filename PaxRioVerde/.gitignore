@@ -17,13 +17,3 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
-
-# Local build artifacts
-/composeApp/release/
-*.aab
-*.apk
-*.ipa
-
-# AI and IDE artifacts
-.artifacts/
-**/PaxRioVerde/.artifacts/

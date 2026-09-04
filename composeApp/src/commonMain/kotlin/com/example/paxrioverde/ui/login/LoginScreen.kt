@@ -82,6 +82,7 @@ class CpfVisualTransformation : VisualTransformation {
 @Composable
 fun LoginScreen(
     onLoginSuccess: (LoginResponse) -> Unit,
+    onProfileSelection: (List<LoginResponse>) -> Unit,
     onFirstAccessClick: () -> Unit,
     onForgotPasswordClick: () -> Unit,
     viewModel: LoginViewModel = koinViewModel()
@@ -102,6 +103,13 @@ fun LoginScreen(
         isBiometricAvailable = sessionManager.isBiometricEnabled() && 
                              biometricAuthenticator.canAuthenticate() &&
                              authRepository.hasSavedCredentials()
+    }
+
+    LaunchedEffect(uiState.showProfileSelection) {
+        if (uiState.showProfileSelection) {
+            onProfileSelection(uiState.profiles)
+            viewModel.resetProfileSelection()
+        }
     }
 
     Box(

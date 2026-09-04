@@ -56,6 +56,9 @@ import paxrioverde.composeapp.generated.resources.Res
 import paxrioverde.composeapp.generated.resources.med_saude
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 val BrandGreen = Color(0xFF386641)
 val SurfaceColor = Color(0xFFFFFFFF)
@@ -90,9 +93,22 @@ fun DashboardScreen(
     
     var isRefreshing by remember { mutableStateOf(false) }
     val pullToRefreshState = rememberPullToRefreshState()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     LaunchedEffect(Unit) {
         viewModel.checkWhatsNew(currentVersion)
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                userData?.idcliente?.let { viewModel.updatePlanStatus(it) }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     LaunchedEffect(userData?.prox_mens) {
@@ -146,8 +162,8 @@ fun DashboardScreen(
                     userName = userData?.nomecliente ?: "Visitante",
                     userPlano = userData?.plano ?: "Carregando...",
                     planStatus = uiState.planStatus,
-                    userProxMens = userData?.prox_mens ?: "--/--/----",
-                    valorMensalidade = userData?.valormens_prox_mens ?: "0,00",
+                    userProxMens = uiState.nextPaymentDate ?: userData?.prox_mens ?: "--/--/----",
+                    valorMensalidade = uiState.nextPaymentValue ?: userData?.valormens_prox_mens ?: "0,00",
                     valorCartao = userData?.valorcartao,
                     isLoading = userData == null,
                     fontScale = fontScale,

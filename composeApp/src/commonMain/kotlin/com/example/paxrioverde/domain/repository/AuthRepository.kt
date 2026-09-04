@@ -8,9 +8,9 @@ import com.example.paxrioverde.domain.model.NetworkResult
  */
 interface AuthRepository {
     /**
-     * Realiza o login retornando um [NetworkResult].
+     * Realiza o login retornando um [NetworkResult] com a lista de perfis encontrados.
      */
-    suspend fun login(cpf: String, pass: String, rememberMe: Boolean): NetworkResult<LoginResponse>
+    suspend fun login(cpf: String, pass: String, rememberMe: Boolean): NetworkResult<List<LoginResponse>>
     
     /**
      * Retorna as credenciais salvas (CPF e Senha) caso o "Lembrar" esteja ativo.
